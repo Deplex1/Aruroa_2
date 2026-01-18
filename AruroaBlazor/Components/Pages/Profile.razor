@@ -1,0 +1,37 @@
+﻿@page "/profile"
+@using Models
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject NavigationManager Nav
+@inject ProtectedSessionStorage Storage
+
+<h3>Profile</h3>
+
+@if (user == null)
+{
+    <p>You are not logged in</p>
+}
+else
+{
+    <p>Username: @user.username</p>
+    <p>Email: @user.email</p>
+    <p>Admin: @user.IsAdmin</p>
+
+    <button @onclick="Logout">Logout</button>
+}
+
+@code
+{
+    User user;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Storage.GetAsync<User>("user");
+        user = result.Value;
+    }
+
+    async Task Logout()
+    {
+        await Storage.DeleteAsync("user");
+        Nav.NavigateTo("/login");
+    }
+}

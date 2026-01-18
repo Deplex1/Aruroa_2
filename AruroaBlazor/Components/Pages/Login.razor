@@ -1,0 +1,39 @@
+﻿@page "/login"
+@using DBL
+@using Models
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject NavigationManager Nav
+@inject ProtectedSessionStorage Storage
+
+<h3>Login</h3>
+
+<input placeholder="Username" @bind="username" />
+<br />
+<input placeholder="Password" type="password" @bind="password" />
+<br />
+<button @onclick="LoginMethod">Login</button>
+
+<p>@message</p>
+
+@code
+{
+    string username;
+    string password;
+    string message;
+
+    async Task LoginMethod()
+    {
+        UserDB db = new UserDB();
+        User user = await db.LoginAsync(username, password);
+
+        if (user != null)
+        {
+            await Storage.SetAsync("user", user);
+            Nav.NavigateTo("/");
+        }
+        else
+        {
+            message = "Invalid username or password";
+        }
+    }
+}

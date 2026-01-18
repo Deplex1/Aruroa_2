@@ -1,0 +1,39 @@
+﻿@page "/register"
+@using DBL
+@using Models
+@inject NavigationManager Nav
+
+<h3>Register</h3>
+
+<input placeholder="Username" @bind="username" />
+<br />
+<input placeholder="Email" @bind="email" />
+<br />
+<input placeholder="Password" type="password" @bind="password" />
+<br />
+<button @onclick="RegisterMethod">Register</button>
+
+<p>@message</p>
+
+@code
+{
+    string username;
+    string email;
+    string password;
+    string message;
+
+    async Task RegisterMethod()
+    {
+        UserDB db = new UserDB();
+        bool success = await db.RegisterAsync(username, password, email);
+
+        if (success)
+        {
+            Nav.NavigateTo("/login");
+        }
+        else
+        {
+            message = "Registration failed";
+        }
+    }
+}

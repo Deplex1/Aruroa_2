@@ -1,0 +1,15 @@
+﻿@page "/logout"
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject NavigationManager Nav
+@inject ProtectedSessionStorage Storage
+
+<p>Logging out...</p>
+
+@code
+{
+    protected override async Task OnInitializedAsync()
+    {
+        await Storage.DeleteAsync("user");
+        Nav.NavigateTo("/login");
+    }
+}
