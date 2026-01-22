@@ -1,0 +1,111 @@
+﻿@page "/upload"
+@using DBL
+@using Models
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject NavigationManager Nav
+@inject ProtectedSessionStorage Storage
+
+<h3>Upload a New Song</h3>
+
+<div>
+    <label>Song Title:</label><br />
+    <input type="text" @bind="newSong.title" />
+</div>
+
+<br />
+
+<div>
+    <label>Duration (seconds):</label><br />
+    <input type="number" @bind="newSong.duration" />
+</div>
+
+<br />
+
+<div>
+    <label>Select Genre ID:</label><br />
+    <input type="number" @bind="newSong.genreID" />
+</div>
+
+<br />
+
+<div>
+    <label>Upload MP3 File:</label><br />
+    <InputFile OnChange="HandleFileSelected" />
+</div>
+
+<hr />
+
+<button @onclick="SaveSong">Save Song</button>
+<button @onclick="GoBack">Back to Library</button>
+
+<p style="color:red">@message</p>
+
+@code {
+    Song newSong = new Song();
+    string message = "";
+    User currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Try to get the logged-in user from session storage
+        var result = await Storage.GetAsync<User>("user");
+        if (result.Success)
+        {
+            currentUser = result.Value;
+            newSong.userid = currentUser.userid;
+        }
+        else
+        {
+            // If no user is logged in, send them to login page
+            Nav.NavigateTo("/login");
+        }
+    }
+
+    async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        // Get the file selected by the user
+        var file = e.File;
+
+        if (file != null)
+        {
+            // Create a buffer to hold the file bytes
+            var buffer = new byte[file.Size];
+
+            // Open the file stream and read it into our buffer
+            await file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).ReadAsync(buffer);
+
+            // Set the audioData in our model
+            newSong.audioData = buffer;
+            message = "File loaded successfully!";
+        }
+    }
+
+    async Task SaveSong()
+    {
+        if (string.IsNullOrEmpty(newSong.title) || newSong.audioData == null)
+        {
+            message = "Please enter a title and select a file.";
+            return;
+        }
+
+        SongDB db = new SongDB();
+
+        // Correcting the name mismatch from your original SongDB:
+        // We use InsertSongAsync which calls your BaseDB logic
+        Song result = await db.InsertSongAsync(newSong);
+
+        if (result != null)
+        {
+            Nav.NavigateTo("/songs");
+        }
+        else
+        {
+            message = "Error saving song to database.";
+        }
+    }
+
+    void GoBack()
+    {
+        Nav.NavigateTo("/songs");
+    }
+}

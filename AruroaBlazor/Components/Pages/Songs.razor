@@ -1,0 +1,89 @@
+﻿@page "/songs"
+@using DBL
+@using Models
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject NavigationManager Nav
+@inject ProtectedSessionStorage Storage
+
+<h3>Music Library</h3>
+
+<div>
+    <input placeholder="Search by title..." @bind="searchTerm" />
+    <button @onclick="Search">Search</button>
+    <button @onclick="LoadAll">Show All</button>
+</div>
+
+<hr />
+
+@if (songs == null)
+{
+    <p>Loading songs...</p>
+}
+else if (songs.Count == 0)
+{
+    <p>No songs found in the database.</p>
+}
+else
+{
+    @foreach (Song s in songs)
+    {
+        <div style="margin-bottom: 15px;">
+            <b>@s.title</b> | Duration: @s.duration sec
+            <br />
+
+            @if (s.audioData != null && s.audioData.Length > 0)
+            {
+                <audio controls src="data:audio/mp3;base64,@Convert.ToBase64String(s.audioData)"></audio>
+            }
+            else
+            {
+                <i>No audio data available</i>
+            }
+            <hr />
+        </div>
+    }
+}
+
+<br />
+<button @onclick="GoUpload">Upload New Song</button>
+<button @onclick="Logout">Logout</button>
+
+@code
+{
+    List<Song> songs;
+    string searchTerm = "";
+    SongDB db = new SongDB();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAll();
+    }
+
+    async Task LoadAll()
+    {
+        searchTerm = "";
+        // Uses your SongDB.SelectAllSongsAsync() method
+        songs = await db.SelectAllSongsAsync();
+    }
+
+    async Task Search()
+    {
+        if (!string.IsNullOrEmpty(searchTerm))
+        {
+            // Uses your SongDB.SearchSongsAsync(text) method
+            songs = await db.SearchSongsAsync(searchTerm);
+        }
+    }
+
+    void GoUpload()
+    {
+        Nav.NavigateTo("/upload");
+    }
+
+    async Task Logout()
+    {
+        // Deletes the user from session and goes to login
+        await Storage.DeleteAsync("user");
+        Nav.NavigateTo("/login");
+    }
+}
