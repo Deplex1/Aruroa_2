@@ -55,7 +55,20 @@
             // 10 MB limit for 2026 standards
             long maxFileSize = 10 * 1024 * 1024;
 
+            // Open the stream from the browser file
             using var stream = e.File.OpenReadStream(maxFileSize);
+            
+            // Use a MemoryStream to hold the incoming bytes
+            using var ms = new MemoryStream();
+
+            // Copy the data from the browser stream to memory
+            await stream.CopyToAsync(ms);
+
+            // put the memory inside the fileData property
+            fileData = ms.ToArray();
+
+            message = $"File '{e.File.Name}' uploaded successfully.";
+
         }
         catch (System.IO.IOException ex)
         {
