@@ -9,6 +9,9 @@
         public int userid { get; set; }
         public int genreID { get; set; }
 
+        // Used only in UI to play audio (not saved in DB)
+        public string audioSource { get; set; }
+
         public Song()
         {
         }
