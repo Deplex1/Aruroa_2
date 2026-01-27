@@ -7,13 +7,14 @@
 
 <h2>Aurora Music</h2>
 
-@if (userId == 0)
+@if (user == null)
 {
     <button @onclick="GoLogin">Login</button>
+
 }
 else
 {
-    <span>Logged in as user @userId</span>
+    <span>Hello @user.username</span>
     <button @onclick="Logout">Logout</button>
     <button @onclick="GoUpload">Upload Song</button>
 }
@@ -65,15 +66,17 @@ else
     List<Song> popularSongs = new List<Song>();
     List<Song> newSongs = new List<Song>();
 
-    int userId = 0;
+    User user = null;
+
+
 
     protected override async Task OnAfterRenderAsync(bool first)
     {
         // Check if user is logged in
-        var result = await Storage.GetAsync<int>("userid");
+        var result = await Storage.GetAsync<User>("user");
         if (result.Success)
         {
-            userId = result.Value;
+            user = result.Value;
         }
 
         // Load songs
