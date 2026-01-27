@@ -1,0 +1,113 @@
+﻿@page "/"
+@using DBL
+@using Models
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject NavigationManager Nav
+@inject ProtectedSessionStorage Storage
+
+<h2>Aurora Music</h2>
+
+@if (userId == 0)
+{
+    <button @onclick="GoLogin">Login</button>
+}
+else
+{
+    <span>Logged in as user @userId</span>
+    <button @onclick="Logout">Logout</button>
+    <button @onclick="GoUpload">Upload Song</button>
+}
+
+<hr />
+
+<h3>Popular Songs</h3>
+
+@if (popularSongs.Count == 0)
+{
+    <p>No songs found.</p>
+}
+else
+{
+    foreach (Song s in popularSongs)
+    {
+        <div>
+            <b>@s.title</b><br />
+            Duration: @FormatTime(s.duration)<br />
+            Plays: @s.plays<br />
+            <button @onclick="() => GoSongs()">Open</button>
+            <hr />
+        </div>
+    }
+}
+
+<h3>New Songs</h3>
+
+@if (newSongs.Count == 0)
+{
+    <p>No songs found.</p>
+}
+else
+{
+    foreach (Song s in newSongs)
+    {
+        <div>
+            <b>@s.title</b><br />
+            Duration: @FormatTime(s.duration)<br />
+            Uploaded: @s.uploaded<br />
+            <button @onclick="() => GoSongs()">Open</button>
+            <hr />
+        </div>
+    }
+}
+
+@code
+{
+    List<Song> popularSongs = new List<Song>();
+    List<Song> newSongs = new List<Song>();
+
+    int userId = 0;
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        // Check if user is logged in
+        var result = await Storage.GetAsync<int>("userid");
+        if (result.Success)
+        {
+            userId = result.Value;
+        }
+
+        // Load songs
+        SongDB db = new SongDB();
+
+        popularSongs = await db.GetPopularSongsAsync();
+        newSongs = await db.GetNewSongsAsync();
+    }
+
+    void GoLogin()
+    {
+        Nav.NavigateTo("/login");
+    }
+
+    void GoUpload()
+    {
+        Nav.NavigateTo("/upload");
+    }
+
+    void GoSongs()
+    {
+        Nav.NavigateTo("/songs");
+    }
+
+    async Task Logout()
+    {
+        await Storage.DeleteAsync("userid");
+        Nav.NavigateTo("/login", true);
+    }
+
+    string FormatTime(int seconds)
+    {
+        int min = seconds / 60;
+        int sec = seconds % 60;
+        return min + ":" + sec.ToString("D2");
+    }
+}

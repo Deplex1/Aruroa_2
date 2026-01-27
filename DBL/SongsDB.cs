@@ -41,7 +41,26 @@ namespace DBL
             // genreid
             s.genreID = int.Parse(row[5].ToString());
 
-            return s;
+            DateTime time = new DateTime();
+
+            if (row[6] != null)
+            {
+                s.uploaded = DateTime.Parse(row[6].ToString());
+            }
+            else
+            {
+                s.uploaded = DateTime.Now;
+            }
+
+            if (row[7] != null)
+            {
+                s.plays = int.Parse(row[7].ToString());
+            }
+            else
+            {
+                s.plays = 0;
+            }
+                return s;
         }
 
         // Get all songs
@@ -90,5 +109,30 @@ namespace DBL
 
             return await InsertGetObjAsync(values);
         }
+
+        public async Task<List<Song>> GetPopularSongsAsync()
+        {
+            string sql = "SELECT * FROM songs ORDER BY plays DESC LIMIT 10";
+            return await SelectAllAsync(sql);
+        }
+
+        public async Task<List<Song>> GetNewSongsAsync()
+        {
+            string sql = "SELECT * FROM songs ORDER BY uploaded DESC LIMIT 10";
+            return await SelectAllAsync(sql);
+        }
+
+        public async Task AddPlayAsync(int songId)
+        {
+            Dictionary<string, object> fields = new Dictionary<string, object>();
+            fields.Add("plays", "plays + 1"); // special handling later
+
+            Dictionary<string, object> where = new Dictionary<string, object>();
+            where.Add("songid", songId);
+
+            string sql = "UPDATE songs SET plays = plays + 1 WHERE songid = @songid";
+            await SelectAllAsync(sql, where);
+        }
+
     }
 }
