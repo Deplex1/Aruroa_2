@@ -5,19 +5,60 @@
 @inject NavigationManager Nav
 @inject ProtectedSessionStorage Storage
 
+<style>
+    body
+    {
+        font-family: Arial, sans-serif;
+    }
+
+    h2
+    {
+        margin-bottom: 10px;
+    }
+
+    .top-bar
+    {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+
+    button
+    {
+        padding: 6px 12px;
+        border: none;
+        background-color: #3a3a3a;
+        color: white;
+        cursor: pointer;
+    }
+
+    button:hover
+    {
+        background-color: #555;
+    }
+
+    .song-card
+    {
+        margin-bottom: 10px;
+    }
+</style>
+
 <h2>Aurora Music</h2>
 
-@if (user == null)
-{
-    <button @onclick="GoLogin">Login</button>
-
-}
-else
-{
-    <span>Hello @user.username</span>
-    <button @onclick="Logout">Logout</button>
-    <button @onclick="GoUpload">Upload Song</button>
-}
+<div class="top-bar">
+    @if (user == null)
+    {
+        <button @onclick="GoLogin">Login</button>
+    }
+    else
+    {
+        <span>Hello @user.username</span>
+        <button @onclick="Logout">Logout</button>
+        <button @onclick="GoUpload">Upload Song</button>
+        <button @onclick="GoProfile">Profile</button>
+    }
+</div>
 
 <hr />
 
@@ -31,7 +72,7 @@ else
 {
     foreach (Song s in popularSongs)
     {
-        <div>
+        <div class="song-card">
             <b>@s.title</b><br />
             Duration: @FormatTime(s.duration)<br />
             Plays: @s.plays<br />
@@ -51,7 +92,7 @@ else
 {
     foreach (Song s in newSongs)
     {
-        <div>
+        <div class="song-card">
             <b>@s.title</b><br />
             Duration: @FormatTime(s.duration)<br />
             Uploaded: @s.uploaded<br />
@@ -68,22 +109,19 @@ else
 
     User user = null;
 
-
-
     protected override async Task OnAfterRenderAsync(bool first)
     {
-        // Check if user is logged in
         var result = await Storage.GetAsync<User>("user");
         if (result.Success)
         {
             user = result.Value;
         }
 
-        // Load songs
         SongDB db = new SongDB();
 
         popularSongs = await db.GetPopularSongsAsync();
         newSongs = await db.GetNewSongsAsync();
+        StateHasChanged();
     }
 
     void GoLogin()
@@ -94,6 +132,11 @@ else
     void GoUpload()
     {
         Nav.NavigateTo("/upload");
+    }
+
+    void GoProfile()
+    {
+        Nav.NavigateTo("/profile");
     }
 
     void GoSongs()

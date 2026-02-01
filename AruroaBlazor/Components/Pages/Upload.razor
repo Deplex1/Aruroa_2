@@ -36,7 +36,7 @@
     string message = "";
 
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+        protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         var result = await Storage.GetAsync<User>("user");
 

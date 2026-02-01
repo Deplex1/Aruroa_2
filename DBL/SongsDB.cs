@@ -80,6 +80,21 @@ namespace DBL
             return await SelectAllAsync(sql, p);
         }
 
+        public async Task<List<Song>> SelectSongsByUserIDAsync(int id)
+        {
+            Dictionary<string, object> p = new Dictionary<string, object>();
+            p.Add("userid", id);
+
+            List<Song> list = await SelectAllAsync(p);
+
+            if (list.Count != 0)
+            {
+                return list;
+            }
+
+            return null;
+        }
+
         // Get one song by id
         public async Task<Song> SelectSingleSongAsync(int id)
         {

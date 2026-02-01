@@ -6,6 +6,8 @@
 @inject NavigationManager Nav
 @inject ProtectedSessionStorage Storage
 
+
+
 <h3>Songs</h3>
 
 <input placeholder="Search song..." @bind="searchTerm" />
@@ -22,7 +24,21 @@
 
             Duration: @FormatDuration(s.duration)<br />
 
-            <audio controls src="@GetAudioSource(s.audioData)"></audio>
+            <audio controls src="@s.GetAudioSource(s.audioData)"></audio>
+
+            <div class="star-rating">
+                @for (int i = 1; i <= 5; i++)
+                {
+                    <span class="star @(i <= GetHoverRating(s.songID) ? "hovered" : (i <= GetSelectedRating(s.songID) ? "selected" : ""))"
+                          @onmouseover="() => SetHoverRating(s.songID, i)"
+                          @onmouseout="() => SetHoverRating(s.songID, 0)"
+                          @onclick="() => SetSelectedRating(s.songID, i)">
+                        ★
+                    </span>
+                }
+            </div>
+
+
 
             <hr />
         </div>
@@ -60,16 +76,7 @@
         Nav.NavigateTo("/login");
     }
 
-    string GetAudioSource(byte[] data)
-    {
-        if (data == null || data.Length == 0)
-        {
-            return "";
-        }
-
-        string base64 = Convert.ToBase64String(data);
-        return "data:audio/mpeg;base64," + base64;
-    }
+    
 
     string FormatDuration(int seconds)
     {
@@ -77,5 +84,37 @@
         int sec = seconds % 60;
 
         return min.ToString() + ":" + sec.ToString("00");
+    }
+
+    // Tracks the clicked (permanent) rating per song
+    Dictionary<int, int> selectedRatings = new Dictionary<int, int>();
+
+    // Tracks the hover rating per song (temporary)
+    Dictionary<int, int> hoverRatings = new Dictionary<int, int>();
+
+    // Called when mouse hovers over a star
+    void SetHoverRating(int songId, int value)
+    {
+        hoverRatings[songId] = value;
+    }
+
+    // Called when a star is clicked
+    void SetSelectedRating(int songId, int value)
+    {
+        selectedRatings[songId] = value;
+        // TODO: Call your DB here to save rating
+        // Example: await ratingDB.AddOrUpdateRatingAsync(user.userid, songId, value);
+    }
+
+    // Get current hover value for this song
+    int GetHoverRating(int songId)
+    {
+        return hoverRatings.ContainsKey(songId) ? hoverRatings[songId] : 0;
+    }
+
+    // Get current selected value for this song
+    int GetSelectedRating(int songId)
+    {
+        return selectedRatings.ContainsKey(songId) ? selectedRatings[songId] : 0;
     }
 }

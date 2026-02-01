@@ -15,6 +15,16 @@
         // Used only in UI to play audio (not saved in DB)
         public string audioSource { get; set; }
 
+        public string GetAudioSource(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+            {
+                return "";
+            }
+
+            string base64 = Convert.ToBase64String(data);
+            return "data:audio/mpeg;base64," + base64;
+        }
         public Song()
         {
         }

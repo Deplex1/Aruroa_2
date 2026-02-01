@@ -16,17 +16,41 @@ else
     <p>Email: @user.email</p>
     <p>Admin: @user.IsAdmin</p>
 
+    @if (UserSongs.Count == 0)
+    {
+        <p>No songs uploaded</p>
+    }
+
+
+    else
+    {
+        <h1> Uploaded Songs: </h1>
+        @foreach (Song songs in UserSongs)
+        {
+            <p> @songs.title </p>
+            <audio controls src="@songs.GetAudioSource(songs.audioData)"></audio>
+
+        }
+
+    }
     <button @onclick="Logout">Logout</button>
 }
 
 @code
 {
     User user;
+    List<Song> UserSongs = new List<Song>();
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstbool)
     {
         var result = await Storage.GetAsync<User>("user");
-        user = result.Value;
+        if (result.Success)
+        {
+            user = result.Value;
+            StateHasChanged();
+            DBL.SongDB songDB = new DBL.SongDB();
+            UserSongs = await songDB.SelectSongsByUserIDAsync(user.userid);
+        }
     }
 
     async Task Logout()

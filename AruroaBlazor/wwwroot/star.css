@@ -1,0 +1,22 @@
+﻿.star-rating {
+    display: inline-flex;
+}
+
+.star {
+    font-size: 22px;
+    cursor: pointer;
+    color: #ccc; /* unselected star color */
+    user-select: none;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+    /* Hovered stars are gold */
+    .star.hovered {
+        color: gold;
+    }
+
+    /* Selected (clicked) stars are gold */
+    .star.selected {
+        color: gold;
+    }
