@@ -1,22 +1,28 @@
 ﻿.star-rating {
     display: inline-flex;
+    gap: 4px;
 }
 
 .star {
-    font-size: 22px;
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    text-align: center;
+    font-size: 28px;
     cursor: pointer;
-    color: #ccc; /* unselected star color */
+    line-height: 30px;
     user-select: none;
-    line-height: 1;
-    transition: color 0.2s;
+    border-radius: 50%;
+    transition: color 0.2s, transform 0.15s;
+    color: #ccc;
+    text-shadow: 0 0 1px #999;
 }
 
-    /* Hovered stars are gold */
-    .star.hovered {
+    .star.filled {
         color: gold;
+        text-shadow: 0 0 2px #ffdd66;
     }
 
-    /* Selected (clicked) stars are gold */
-    .star.selected {
-        color: gold;
+    .star:hover {
+        transform: scale(1.2);
     }

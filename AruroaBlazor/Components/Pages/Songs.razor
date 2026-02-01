@@ -6,39 +6,41 @@
 @inject NavigationManager Nav
 @inject ProtectedSessionStorage Storage
 
+<link rel="stylesheet" href="C:\Users\Twelve.DESKTOP-MG3L518\source\repos\Aruroa\AruroaBlazor\wwwroot\star.css" />
 
 
 <h3>Songs</h3>
 
-<input placeholder="Search song..." @bind="searchTerm" />
+
+<!-- Simple search input -->
+<input placeholder="Search song..." @bind="searchText" />
 <button @onclick="Search">Search</button>
 
 <hr />
 
-@if (songs != null)
+@if (songList != null)
 {
-    foreach (Song s in songs)
+    foreach (Song song in songList)
     {
         <div>
-            <b>@s.title</b><br />
+            <b>@song.title</b><br />
 
-            Duration: @FormatDuration(s.duration)<br />
+            Duration: @FormatDuration(song.duration)<br />
 
-            <audio controls src="@s.GetAudioSource(s.audioData)"></audio>
+            <audio controls src="@song.GetAudioSource(song.audioData)"></audio>
 
             <div class="star-rating">
                 @for (int i = 1; i <= 5; i++)
                 {
-                    <span class="star @(i <= GetHoverRating(s.songID) ? "hovered" : (i <= GetSelectedRating(s.songID) ? "selected" : ""))"
-                          @onmouseover="() => SetHoverRating(s.songID, i)"
-                          @onmouseout="() => SetHoverRating(s.songID, 0)"
-                          @onclick="() => SetSelectedRating(s.songID, i)">
+                    <!-- show a filled star when appropriate -->
+                    <span class="star @(IsStarFilled(song.songID, i) ? "filled" : "")"
+                          @onmouseover="() => OnHover(song.songID, i)"
+                          @onmouseout="() => OnHover(song.songID, 0)"
+                          @onclick="() => OnClick(song.songID, i)">
                         ★
                     </span>
                 }
             </div>
-
-
 
             <hr />
         </div>
@@ -50,71 +52,93 @@
 
 @code
 {
-    List<Song> songs = new List<Song>();
-    string searchTerm = "";
+    // List of songs shown on the page
+    List<Song> songList = new List<Song>();
+
+    // Text the user types into the search box
+    string searchText = "";
 
     protected override async Task OnInitializedAsync()
     {
+        // Load all songs when the page opens
         SongDB db = new SongDB();
-        songs = await db.SelectAllSongsAsync();
+        songList = await db.SelectAllSongsAsync();
     }
 
+    // Search for songs by title (simple wrapper)
     async Task Search()
     {
         SongDB db = new SongDB();
-        songs = await db.SearchSongsAsync(searchTerm);
+        songList = await db.SearchSongsAsync(searchText);
     }
 
     void GoUpload()
     {
+        // Navigate to the upload page
         Nav.NavigateTo("/upload");
     }
 
     async Task Logout()
     {
+        // Remove the saved user and go to the login page
         await Storage.DeleteAsync("user");
         Nav.NavigateTo("/login");
     }
 
-    
-
+    // Convert seconds to "m:ss" format (easy to read)
     string FormatDuration(int seconds)
     {
-        int min = seconds / 60;
-        int sec = seconds % 60;
-
-        return min.ToString() + ":" + sec.ToString("00");
+        int minutes = seconds / 60;
+        int secs = seconds % 60;
+        return minutes.ToString() + ":" + secs.ToString("00");
     }
 
-    // Tracks the clicked (permanent) rating per song
-    Dictionary<int, int> selectedRatings = new Dictionary<int, int>();
+    //RATING
 
-    // Tracks the hover rating per song (temporary)
-    Dictionary<int, int> hoverRatings = new Dictionary<int, int>();
+    // stores the rating the user has clicked (songId -> value)
+    Dictionary<int, int> userRatings = new Dictionary<int, int>();
 
-    // Called when mouse hovers over a star
-    void SetHoverRating(int songId, int value)
+    // stores the temporary hover preview (songId -> value)
+    Dictionary<int, int> previewRatings = new Dictionary<int, int>();
+
+    // Called when the mouse moves over or out of a star.
+    // If value is 0 we remove the preview so stale zeros don't stay.
+    void OnHover(int songId, int value)
     {
-        hoverRatings[songId] = value;
+        if (value > 0)
+        {
+            Console.WriteLine("Mouse Hoverd!", songId);
+            previewRatings[songId] = value;
+        }
+        else
+        {
+            // remove preview when the mouse leaves the star area
+            previewRatings.Remove(songId);
+        }
+
+        StateHasChanged();
     }
 
-    // Called when a star is clicked
-    void SetSelectedRating(int songId, int value)
+    // Called when the user clicks a star to pick a rating.
+    // Right now this only updates local UI state. You can later
+    // call a DB method here to save the rating permanently.
+    async Task OnClick(int songId, int value)
     {
-        selectedRatings[songId] = value;
-        // TODO: Call your DB here to save rating
-        // Example: await ratingDB.AddOrUpdateRatingAsync(user.userid, songId, value);
+        userRatings[songId] = value;
+        StateHasChanged();
     }
 
-    // Get current hover value for this song
-    int GetHoverRating(int songId)
+    // Decide if a star should look filled:
+    // - show preview if the mouse is over stars
+    // - otherwise show the saved user rating if present
+    bool IsStarFilled(int songId, int starIndex)
     {
-        return hoverRatings.ContainsKey(songId) ? hoverRatings[songId] : 0;
-    }
+        if (previewRatings.ContainsKey(songId) && previewRatings[songId] > 0)
+            return starIndex <= previewRatings[songId];
 
-    // Get current selected value for this song
-    int GetSelectedRating(int songId)
-    {
-        return selectedRatings.ContainsKey(songId) ? selectedRatings[songId] : 0;
+        if (userRatings.ContainsKey(songId))
+            return starIndex <= userRatings[songId];
+
+        return false;
     }
 }
