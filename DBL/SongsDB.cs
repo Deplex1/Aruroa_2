@@ -16,6 +16,20 @@ namespace DBL
             return "songid";
         }
 
+           public async Task<int> AddSongAsync(Song song)
+    {
+        // Create dictionary for DB insert
+        var values = new Dictionary<string, object>
+        {
+            { "title", song.title },
+            { "audioData", song.audioData },
+            { "userid", song.userid },
+            { "uploaded", song.uploaded }
+        };
+
+        // Call the protected InsertAsync from BaseDB
+        return await InsertAsync(values);
+    }
         protected async override Task<Song> CreateModelAsync(object[] row)
         {
             Song s = new Song();

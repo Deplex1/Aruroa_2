@@ -4,80 +4,93 @@
 @inject NavigationManager Nav
 @inject ProtectedSessionStorage Storage
 
+<link href="css/site.css" rel="stylesheet" />
+<link href="css/profile.css" rel="stylesheet" />
 
-<style>
-    .profile-pic {
-        width: 150px;
-        height: 150px;
-        object-fit: cover;
-        border-radius: 50%;
-        border: 2px solid cyan;
-        margin-bottom: 15px;
-    }
-</style>
-<h3>Profile</h3>
+<div class="page-container">
 
-@if (user == null)
-{
-    <p>You are not logged in</p>
-}
-else
-{
-
-    <p>Username: @user.username</p>
-    <p>Email: @user.email</p>
-    <p>Admin: @user.IsAdmin</p>
-
-    @if (user.profilepicture != null)
+    @if (user == null)
     {
-        <img src="@GetProfileImage(user.profilepicture)"
-             class="profile-pic" />
+        <p>You are not logged in</p>
     }
     else
     {
-        <p>No profile picture</p>
+        <div class="profile-container">
+
+            <div class="profile-header">
+                <label class="avatar-wrapper">
+                    @if (user.profilepicture != null)
+                    {
+                        <img src="@GetProfileImage(user.profilepicture)" class="avatar-img" />
+                    }
+                    else
+                    {
+                        <span class="avatar-placeholder">+</span>
+                    }
+                    <InputFile OnChange="OnProfileImageSelected" accept="image/*" style="display:none" />
+                </label>
+
+                <strong>@user.username</strong>
+            </div>
+
+            <div class="profile-info">
+                <p>Email: @user.email</p>
+                <p>Admin: @user.IsAdmin</p>
+            </div>
+
+            <div class="profile-songs">
+                <h4>Uploaded Songs</h4>
+                @if (UserSongs.Count == 0)
+                {
+                    <p>No songs uploaded</p>
+                }
+                else
+                {
+                    @foreach (Song songs in UserSongs)
+                    {
+                        <div class="profile-song">
+                            <p>@songs.title</p>
+                            <audio controls src="@songs.GetAudioSource(songs.audioData)"></audio>
+                        </div>
+                    }
+                }
+            </div>
+
+            <div class="profile-actions">
+                <button @onclick="GoUpload">Upload Song</button>
+                <button @onclick="Logout">Logout</button>
+            </div>
+
+        </div>
     }
+</div>
 
-
-
-    @if (UserSongs.Count == 0)
-    {
-        <p>No songs uploaded</p>
-    }
-
-
-    else
-    {
-        <h1> Uploaded Songs: </h1>
-        @foreach (Song songs in UserSongs)
-        {
-            <p> @songs.title </p>
-            <audio controls src="@songs.GetAudioSource(songs.audioData)"></audio>
-
-        }
-
-    }
-    <button @onclick="Logout">Logout</button>
-}
-
-@code
-{
+@code {
     User user;
     List<Song> UserSongs = new List<Song>();
 
-    protected override async Task OnAfterRenderAsync(bool firstbool)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstbool)
-            return;
+        if (!firstRender) return;
 
         var result = await Storage.GetAsync<User>("user");
         if (result.Success)
         {
             user = result.Value;
+            await LoadUserSongs();
             StateHasChanged();
-            DBL.SongDB songDB = new DBL.SongDB();
-            UserSongs = await songDB.SelectSongsByUserIDAsync(user.userid);
         }
+    }
+
+    async Task LoadUserSongs()
+    {
+        DBL.SongDB songDB = new DBL.SongDB();
+        UserSongs = await songDB.SelectSongsByUserIDAsync(user.userid);
+    }
+
+    void GoUpload()
+    {
+        Nav.NavigateTo("/upload");
     }
 
     async Task Logout()
@@ -86,13 +99,26 @@ else
         Nav.NavigateTo("/login");
     }
 
+    async Task OnProfileImageSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+
+        byte[] imageBytes = ms.ToArray();
+        user.profilepicture = imageBytes;
+
+        DBL.UserDB userDB = new DBL.UserDB();
+        await userDB.UpdateUserAsync(user.userid, new Dictionary<string, object> { { "profilepicture", imageBytes } });
+        StateHasChanged();
+    }
 
     string GetProfileImage(byte[] imageData)
     {
-        if (imageData == null || imageData.Length == 0)
-            return null;
-
-        string base64 = Convert.ToBase64String(imageData);
-        return $"data:image/png;base64,{base64}";
+        if (imageData == null || imageData.Length == 0) return null;
+        return $"data:image/png;base64,{Convert.ToBase64String(imageData)}";
     }
 }

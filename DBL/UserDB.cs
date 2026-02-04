@@ -1,21 +1,17 @@
 ﻿using Models;
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace DBL
 {
     public class UserDB : BaseDB<User>
     {
-        protected override string GetTableName()
-        {
-            return "users";
-        }
-
-        protected override string GetPrimaryKeyName()
-        {
-            return "userid";
-        }
+        protected override string GetTableName() => "users";
+        protected override string GetPrimaryKeyName() => "userid";
 
         protected async override Task<User> CreateModelAsync(object[] row)
         {
@@ -30,30 +26,104 @@ namespace DBL
             return u;
         }
 
+        // ------------------- REGISTRATION -------------------
+        public async Task<(bool Success, string Message)> RegisterAsync(string username, string password, string email)
+        {
+            // Validate inputs
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(email))
+                return (false, "All fields are required.");
+
+            if (!IsValidEmail(email))
+                return (false, "Invalid email format.");
+
+            // Check for duplicates
+            if (await UsernameExistsAsync(username))
+                return (false, "Username already taken.");
+
+            if (await EmailExistsAsync(email))
+                return (false, "Email already registered.");
+
+            // Hash password
+            string hashedPassword = HashPassword(password);
+
+            // Insert user
+            Dictionary<string, object> values = new Dictionary<string, object>
+            {
+                { "username", username },
+                { "password", hashedPassword },
+                { "email", email },
+                { "IsAdmin", 0 }
+            };
+
+            int rows = await InsertAsync(values);
+
+            if (rows == 1)
+                return (true, "Registration successful.");
+
+            return (false, "Registration failed due to unknown error.");
+        }
+
+        // ------------------- LOGIN -------------------
         public async Task<User> LoginAsync(string username, string password)
         {
-            string sql = "SELECT * FROM users WHERE username=@username AND password=@password";
-            Dictionary<string, object> p = new Dictionary<string, object>();
-            p.Add("username", username);
-            p.Add("password", password);
+            string hashedPassword = HashPassword(password);
 
-            List<User> list = await SelectAllAsync(sql, p);
+            string sql = "SELECT * FROM users WHERE username=@username AND password=@password";
+            var parameters = new Dictionary<string, object>
+            {
+                { "username", username },
+                { "password", hashedPassword }
+            };
+
+            List<User> list = await SelectAllAsync(sql, parameters);
             if (list.Count == 1)
                 return list[0];
 
             return null;
         }
 
-        public async Task<bool> RegisterAsync(string username, string password, string email)
+        // ------------------- HELPERS -------------------
+        private async Task<bool> UsernameExistsAsync(string username)
         {
-            Dictionary<string, object> values = new Dictionary<string, object>();
-            values.Add("username", username);
-            values.Add("password", password);
-            values.Add("email", email);
-            values.Add("IsAdmin", 0);
+            string sql = "SELECT * FROM users WHERE username=@username";
+            List<User> list = await SelectAllAsync(sql, new Dictionary<string, object> { { "username", username } });
+            return list.Count > 0;
+        }
 
-            int rows = await InsertAsync(values);
-            return rows == 1;
+        private async Task<bool> EmailExistsAsync(string email)
+        {
+            string sql = "SELECT * FROM users WHERE email=@email";
+            List<User> list = await SelectAllAsync(sql, new Dictionary<string, object> { { "email", email } });
+            return list.Count > 0;
+        }
+
+        private bool IsValidEmail(string email)
+        {
+            // Simple regex for email validation
+            string pattern = @"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b";
+            return Regex.IsMatch(email, pattern, RegexOptions.IgnoreCase);
+        }
+
+        private string HashPassword(string password)
+        {
+            using SHA256 sha = SHA256.Create();
+            byte[] bytes = Encoding.UTF8.GetBytes(password);
+            byte[] hash = sha.ComputeHash(bytes);
+            return Convert.ToBase64String(hash);
+        }
+
+        // ------------------- UPDATES -------------------
+
+        public async Task<int> UpdateUserAsync(int userId, Dictionary<string, object> fieldsToUpdate)
+        {
+            // 'fieldsToUpdate' is a dictionary like { "profilepicture", imageBytes }
+            Dictionary<string, object> where = new Dictionary<string, object>
+            {
+                { "userid", userId }
+            };
+
+            // Call the BaseDB.UpdateAsync method
+            return await UpdateAsync(fieldsToUpdate, where);
         }
     }
 }

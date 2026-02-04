@@ -1,105 +1,86 @@
 ﻿@page "/upload"
 @using DBL
 @using Models
-@using Microsoft.AspNetCore.Components.Forms; 
+@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @inject NavigationManager Nav
-@inject ProtectedSessionStorage Storage 
+@inject ProtectedSessionStorage Storage
 
 <h3>Upload Song</h3>
 
-<input type="text" placeholder="Title" @bind="title" />
-<br />
-
-<input type="number" placeholder="Genre ID" @bind="genreID" />
-<br />
-
-
-<InputFile OnChange="OnFileSelected" />
-
-
-
-<br />
-
-<button @onclick="UploadSong">Upload</button>
-
-<p>@message</p>
-
-@code
+@if (user == null)
 {
+    <p>You must be logged in to upload a song.</p>
+}
+else
+{
+    <input placeholder="Song Title" @bind="title" />
+    <br />
+    <InputFile OnChange="OnFileSelected" accept="audio/*" />
+    <br />
+    <button @onclick="UploadSong">Upload</button>
+    <p>@message</p>
+}
 
-    User user = null;
-    string title = "";
-    int genreID = 1;
-    byte[] fileData = null;
-    int duration = 0;
-    string message = "";
+@code {
+    User user;
+    IBrowserFile selectedFile;
+    string title;
+    string message;
 
-
-        protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!firstRender) return;
+
         var result = await Storage.GetAsync<User>("user");
-
-        if (!result.Success)
+        if (result.Success)
         {
-            Nav.NavigateTo("/login");
+            user = result.Value;
+            StateHasChanged();
         }
-
-        user = result.Value;
     }
 
-    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    void OnFileSelected(InputFileChangeEventArgs e)
     {
-        try
-        {
-            // 10 MB limit for 2026 standards
-            long maxFileSize = 10 * 1024 * 1024;
-
-            // Open the stream from the browser file
-            using var stream = e.File.OpenReadStream(maxFileSize);
-            
-            // Use a MemoryStream to hold the incoming bytes
-            using var ms = new MemoryStream();
-
-            // Copy the data from the browser stream to memory
-            await stream.CopyToAsync(ms);
-
-            // put the memory inside the fileData property
-            fileData = ms.ToArray();
-
-            message = $"File '{e.File.Name}' uploaded successfully.";
-
-        }
-        catch (System.IO.IOException ex)
-        {
-            // Handle file size or IO issues specifically
-            Console.WriteLine($"File error: {ex.Message}");
-        }
-        catch (Exception ex)
-        {
-            // Handle all other unexpected errors
-            Console.WriteLine($"Upload failed: {ex.Message}");
-        }
+        selectedFile = e.File;
     }
-    
 
     async Task UploadSong()
     {
-        if(fileData != null)
+        if (string.IsNullOrWhiteSpace(title))
         {
-            Song s = new Song();
-            s.title = title;
-            s.duration = duration;
-            s.audioData = fileData;
-            s.userid = user.userid;
-            s.genreID = genreID;
-
-            SongDB db = new SongDB();
-            await db.InsertSongAsync(s);
-
-            message = "Song uploaded successfully";
+            message = "Please enter a song title.";
+            return;
         }
-        else
-            message = "No song found, Have you uploaded a song?";
+
+        if (selectedFile == null)
+        {
+            message = "Please select an audio file.";
+            return;
+        }
+
+        using var stream = selectedFile.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+
+        byte[] audioData = ms.ToArray();
+
+        // Create Song object
+        Song song = new Song
+        {
+            title = title,
+            audioData = audioData,
+            userid = user.userid,
+            uploaded = DateTime.Now
+        };
+
+        // Insert using public method
+        SongDB songDB = new SongDB();
+        await songDB.AddSongAsync(song);
+
+        message = "Song uploaded successfully!";
+        title = "";
+        selectedFile = null;
     }
+
 }

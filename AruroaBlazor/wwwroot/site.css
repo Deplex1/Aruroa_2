@@ -1,0 +1,92 @@
+﻿/* ---- Page container ---- */
+.page-container {
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 30px;
+    background-color: #181c2f;
+    border-radius: 12px;
+    box-shadow: 0 0 30px rgba(0,0,0,0.4);
+    color: #e6e6eb;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ---- Headings ---- */
+h1, h2, h3 {
+    margin-top: 0;
+    color: #ffffff;
+}
+
+/* ---- Inputs ---- */
+input {
+    width: 100%;
+    padding: 10px;
+    margin: 6px 0 14px 0;
+    border-radius: 6px;
+    border: none;
+    outline: none;
+    font-size: 14px;
+}
+
+/* ---- Buttons ---- */
+button {
+    padding: 10px 18px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    background-color: #3b82f6;
+    color: white;
+    transition: background-color 0.2s;
+}
+
+    button:hover {
+        background-color: #2563eb;
+    }
+
+/* ---- Audio ---- */
+audio {
+    width: 100%;
+    margin-top: 8px;
+}
+
+/* ---- Messages ---- */
+.message-error {
+    color: #ff6b6b;
+}
+
+.message-success {
+    color: #4ade80;
+}
+
+/* ---- Star ratings (generic) ---- */
+.star-rating {
+    display: inline-flex;
+    gap: 4px;
+}
+
+.star {
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    text-align: center;
+    font-size: 28px;
+    cursor: pointer;
+    line-height: 30px;
+    user-select: none;
+    border-radius: 50%;
+    transition: color 0.2s, transform 0.15s;
+}
+
+    .star.unfilled {
+        color: #ccc;
+        text-shadow: 0 0 1px #999;
+    }
+
+    .star.filled {
+        color: gold;
+        text-shadow: 0 0 2px #ffdd66;
+    }
+
+    .star:hover {
+        transform: scale(1.2);
+    }

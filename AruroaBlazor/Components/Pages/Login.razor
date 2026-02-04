@@ -15,21 +15,26 @@
 
 <p>@message</p>
 
-@code
-{
+@code {
     string username;
     string password;
     string message;
+    UserDB userDB = new UserDB();
 
     async Task LoginMethod()
     {
-        UserDB db = new UserDB();
-        User user = await db.LoginAsync(username, password);
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            message = "Username and password are required";
+            return;
+        }
 
+        var user = await userDB.LoginAsync(username, password);
         if (user != null)
         {
+            // Save user in session storage
             await Storage.SetAsync("user", user);
-            Nav.NavigateTo("/");
+            Nav.NavigateTo("/"); // redirect to homepage
         }
         else
         {

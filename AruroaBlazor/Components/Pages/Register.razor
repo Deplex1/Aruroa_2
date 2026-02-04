@@ -15,25 +15,48 @@
 
 <p>@message</p>
 
-@code
-{
+@code {
     string username;
     string email;
     string password;
     string message;
+    UserDB userDB = new UserDB();
 
     async Task RegisterMethod()
     {
-        UserDB db = new UserDB();
-        bool success = await db.RegisterAsync(username, password, email);
+        if (string.IsNullOrWhiteSpace(username) ||
+            string.IsNullOrWhiteSpace(password) ||
+            string.IsNullOrWhiteSpace(email))
+        {
+            message = "All fields are required";
+            return;
+        }
 
-        if (success)
+        if (!IsValidEmail(email))
+        {
+            message = "Invalid email address";
+            return;
+        }
+
+        // Call RegisterAsync which handles duplicates internally
+        var result = await userDB.RegisterAsync(username, password, email);
+
+        if (result.Success)
         {
             Nav.NavigateTo("/login");
         }
         else
         {
-            message = "Registration failed";
+            message = result.Message;
         }
+    }
+
+    static bool IsValidEmail(string email)
+    {
+        return System.Text.RegularExpressions.Regex.IsMatch(
+            email,
+            @"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase
+        );
     }
 }
