@@ -1,0 +1,85 @@
+﻿@page "/playlist/{id:int}"
+
+@using Models
+@using DBL
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject ProtectedSessionStorage Storage
+@inject NavigationManager Nav
+
+<h3>Playlist</h3>
+
+@if (playlist == null)
+{
+    <p>Playlist not found.</p>
+}
+else
+{
+    <h4>@playlist.name</h4>
+
+    @if (songs.Count == 0)
+    {
+        <p>No songs in this playlist.</p>
+    }
+    else
+    {
+        @foreach (Song song in songs)
+        {
+            <div>
+                <p>@song.title</p>
+                <audio controls src="@song.GetAudioSource(song.audioData)"></audio>
+            </div>
+        }
+    }
+}
+
+@code
+{
+    [Parameter]
+    public int id { get; set; } // Blazor automatically maps {id} from URL
+
+    User user;
+    Playlist playlist;
+    List<Song> songs = new List<Song>();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        // Load current user (optional, if needed for permissions)
+        var userResult = await Storage.GetAsync<User>("user");
+        if (userResult.Success)
+        {
+            user = userResult.Value;
+        }
+
+        // Load playlist
+        PlaylistDB playlistDB = new PlaylistDB();
+        playlist = await playlistDB.SelectByIdAsync(id);
+
+        if (playlist == null)
+        {
+            StateHasChanged();
+            return;
+        }
+
+        // Load songs in playlist
+        PlaylistSongDB playlistSongDB = new PlaylistSongDB();
+        List<PlaylistSong> playlistSongs =
+            await playlistSongDB.GetSongsInPlaylistAsync(id);
+
+        SongDB songDB = new SongDB();
+        songs = new List<Song>();
+
+        foreach (PlaylistSong ps in playlistSongs)
+        {
+            Song song = await songDB.SelectByIdAsync(ps.songid);
+            if (song != null)
+            {
+                songs.Add(song);
+            }
+        }
+
+        StateHasChanged();
+    }
+}

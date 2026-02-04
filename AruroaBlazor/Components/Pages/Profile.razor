@@ -55,6 +55,27 @@
                     }
                 }
             </div>
+            <div class="profile-playlists">
+                <h4>Playlists</h4>
+
+                @if (UserPlaylists.Count == 0)
+                {
+                    <p>No playlists created</p>
+                }
+                else
+                {
+                    @foreach (Playlist p in UserPlaylists)
+                    {
+                        <div class="playlist-item">
+                            <a href="/playlist/@p.playlistid">@p.name</a>
+
+                            <span>
+                                @(p.ispublic ? "Public" : "Private")
+                            </span>
+                        </div>
+                    }
+                }
+            </div>
 
             <div class="profile-actions">
                 <button @onclick="GoUpload">Upload Song</button>
@@ -68,6 +89,8 @@
 @code {
     User user;
     List<Song> UserSongs = new List<Song>();
+    List<Playlist> UserPlaylists = new List<Playlist>();
+
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -86,6 +109,10 @@
     {
         DBL.SongDB songDB = new DBL.SongDB();
         UserSongs = await songDB.SelectSongsByUserIDAsync(user.userid);
+
+        DBL.PlaylistDB playlistDB = new DBL.PlaylistDB();
+        UserPlaylists = await playlistDB.GetUserPlaylistsAsync(user.userid);
+
     }
 
     void GoUpload()

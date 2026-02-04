@@ -36,6 +36,22 @@ namespace DBL
         // Call the protected InsertAsync from BaseDB
         return await InsertAsync(values);
     }
+
+        // Get one song by ID (generic SelectById style)
+        public async Task<Song> SelectByIdAsync(int id)
+        {
+            Dictionary<string, object> parameters = new Dictionary<string, object>
+            {
+                { GetPrimaryKeyName(), id }
+            };
+
+            List<Song> list = await SelectAllAsync(parameters);
+
+            if (list.Count == 1)
+                return list[0];
+
+            return null;
+        }
         protected async override Task<Song> CreateModelAsync(object[] row)
         {
             Song s = new Song();
