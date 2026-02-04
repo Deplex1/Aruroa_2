@@ -1,0 +1,176 @@
+﻿@page "/playlists"
+@using Models
+@using DBL
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject ProtectedSessionStorage Storage
+@inject NavigationManager Nav
+
+<h3>Your Playlists</h3>
+
+@if (user == null)
+{
+    <p>You must be logged in to see playlists.</p>
+}
+else
+{
+    <div class="create-playlist">
+        <input placeholder="New Playlist Name" @bind="newPlaylistName" />
+        <label>
+            <input type="checkbox" @bind="ispublic" /> Public
+        </label>
+        <button @onclick="CreatePlaylist">Create</button>
+    </div>
+
+    <hr />
+
+    @if (userPlaylists.Count == 0)
+    {
+        <p>No playlists yet.</p>
+    }
+    else
+    {
+        @foreach (var p in userPlaylists)
+        {
+            <div class="playlist-item">
+                <strong>@p.name</strong>
+                (@(p.ispublic ? "Public" : "Private"))
+                <button @onclick="() => DeletePlaylist(p.playlistid)">Delete</button>
+                <button @onclick="() => SelectPlaylist(p.playlistid)">View Songs</button>
+            </div>
+        }
+    }
+
+    @if (selectedPlaylist != null)
+    {
+        <hr />
+        <h4>Songs in @selectedPlaylist.name</h4>
+        @if (playlistSongs.Count == 0)
+        {
+            <p>No songs in this playlist.</p>
+        }
+        else
+        {
+            <ul>
+                @foreach (var ps in playlistSongs)
+                {
+                    var song = allSongs.FirstOrDefault(s => s.songID == ps.songid);
+                    if (song != null)
+                    {
+                        <li>
+                            @song.title
+                            <button @onclick="() => RemoveSong(ps.songid)">Remove</button>
+                        </li>
+                    }
+                }
+            </ul>
+        }
+
+        <h5>Add Song</h5>
+        <select @bind="songToAddId">
+            <option value="">--Select Song--</option>
+            @foreach (var s in allSongs)
+            {
+                <option value="@s.songID">@s.title</option>
+            }
+        </select>
+        <button @onclick="AddSongToPlaylist">Add</button>
+    }
+}
+
+@code {
+    User user;
+    List<Playlist> userPlaylists = new List<Playlist>();
+    Playlist selectedPlaylist;
+    List<PlaylistSong> playlistSongs = new List<PlaylistSong>();
+    List<Song> allSongs = new List<Song>();
+
+    string newPlaylistName;
+    bool ispublic = true;
+    int songToAddId;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var result = await Storage.GetAsync<User>("user");
+        if (result.Success)
+        {
+            user = result.Value;
+
+            PlaylistDB pdb = new PlaylistDB();
+            userPlaylists = await pdb.GetUserPlaylistsAsync(user.userid);
+
+            SongDB sdb = new SongDB();
+            allSongs = await sdb.SelectAllSongsAsync();
+
+            StateHasChanged();
+        }
+    }
+
+    async Task CreatePlaylist()
+    {
+        if (string.IsNullOrWhiteSpace(newPlaylistName)) return;
+
+        PlaylistDB pdb = new PlaylistDB();
+        await pdb.CreatePlaylistAsync(new Playlist
+        {
+            name = newPlaylistName,
+            userid = user.userid,
+            ispublic = ispublic
+        });
+
+        userPlaylists = await pdb.GetUserPlaylistsAsync(user.userid);
+        newPlaylistName = "";
+    }
+
+    async Task DeletePlaylist(int playlistId)
+    {
+        PlaylistDB pdb = new PlaylistDB();
+        await pdb.DeletePlaylistAsync(playlistId);
+        userPlaylists = await pdb.GetUserPlaylistsAsync(user.userid);
+
+        if (selectedPlaylist != null && selectedPlaylist.playlistid == playlistId)
+        {
+            selectedPlaylist = null;
+            playlistSongs.Clear();
+        }
+    }
+
+    async Task SelectPlaylist(int playlistId)
+    {
+        selectedPlaylist = userPlaylists.FirstOrDefault(p => p.playlistid == playlistId);
+        if (selectedPlaylist != null)
+        {
+            PlaylistSongDB psdb = new PlaylistSongDB();
+            playlistSongs = await psdb.GetSongsInPlaylistAsync(selectedPlaylist.playlistid);
+        }
+    }
+
+    async Task AddSongToPlaylist()
+    {
+        if (selectedPlaylist == null || songToAddId == 0) return;
+
+        PlaylistSongDB psdb = new PlaylistSongDB();
+        int nextPos = playlistSongs.Count + 1;
+        await psdb.AddSongToPlaylistAsync(new PlaylistSong
+        {
+            playlistid = selectedPlaylist.playlistid,
+            songid = songToAddId,
+            position = nextPos,
+            dateadded = DateTime.Now
+        });
+
+        playlistSongs = await psdb.GetSongsInPlaylistAsync(selectedPlaylist.playlistid);
+        songToAddId = 0;
+    }
+
+    async Task RemoveSong(int songId)
+    {
+        if (selectedPlaylist == null) return;
+
+        PlaylistSongDB psdb = new PlaylistSongDB();
+        await psdb.RemoveSongFromPlaylistAsync(selectedPlaylist.playlistid, songId);
+
+        playlistSongs = await psdb.GetSongsInPlaylistAsync(selectedPlaylist.playlistid);
+    }
+}

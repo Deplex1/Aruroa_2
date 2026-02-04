@@ -16,8 +16,14 @@ namespace DBL
             return "songid";
         }
 
-           public async Task<int> AddSongAsync(Song song)
-    {
+        //get all songs
+        public async Task<List<Song>> SelectAllSongsAsync()
+        {
+            
+            return await base.SelectAllAsync(); 
+        }
+        public async Task<int> AddSongAsync(Song song)
+        {
         // Create dictionary for DB insert
         var values = new Dictionary<string, object>
         {
@@ -77,11 +83,8 @@ namespace DBL
                 return s;
         }
 
-        // Get all songs
-        public async Task<List<Song>> SelectAllSongsAsync()
-        {
-            return await SelectAllAsync();
-        }
+        
+        
 
         // Search by title
         public async Task<List<Song>> SearchSongsAsync(string text)
