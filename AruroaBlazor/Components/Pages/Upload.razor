@@ -3,6 +3,7 @@
 @using Models
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using SongManagment
 @inject NavigationManager Nav
 @inject ProtectedSessionStorage Storage
 
@@ -283,7 +284,7 @@ else
             Console.WriteLine($"Audio data size: {audioData.Length} bytes");
 
             // Calculate audio duration
-            int duration = await CalculateAudioDuration(audioData);
+            int duration = await SongManagment.AudioHelper.GetMp3DurationInSeconds(audioData);
             Console.WriteLine($"Calculated duration: {duration} seconds");
 
             Song song = new Song

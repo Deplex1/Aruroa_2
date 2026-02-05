@@ -1,5 +1,6 @@
 ﻿@page "/profile"
 @using Models
+@using DBL
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @inject NavigationManager Nav
 @inject ProtectedSessionStorage Storage
@@ -13,8 +14,10 @@
 else
 {
     <div class="profile-container">
+
         <div class="profile-header">
             <label class="avatar-wrapper">
+
                 @if (user.profilepicture != null)
                 {
                     <img src="@GetProfileImage(user.profilepicture)" class="avatar-img" />
@@ -23,18 +26,34 @@ else
                 {
                     <span class="avatar-placeholder">+</span>
                 }
-                <InputFile OnChange="OnProfileImageSelected" accept="image/*" style="display:none" />
+
+                <InputFile OnChange="OnProfileImageSelected"
+                           accept="image/*"
+                           style="display:none" />
             </label>
+
             <h3>@user.username</h3>
         </div>
 
         <div class="profile-info">
             <p><strong>Email:</strong> @user.email</p>
-            <p><strong>Admin:</strong> @(user?.IsAdmin == 1 ? "Yes" : "No")</p>
+
+            <p>
+                <strong>Admin:</strong>
+                @if (user.IsAdmin == 1)
+                {
+                    <span>Yes</span>
+                }
+                else
+                {
+                    <span>No</span>
+                }
+            </p>
         </div>
 
         <div class="profile-section">
             <h2>Uploaded Songs</h2>
+
             @if (UserSongs == null || UserSongs.Count == 0)
             {
                 <p>No songs uploaded</p>
@@ -45,22 +64,25 @@ else
                 {
                     <div class="song-card">
                         <h4>@song.title</h4>
+
                         @{
-                            var audioSource = song.GetAudioSource(song.audioData);
+                            string audioSource = song.GetAudioSource(song.audioData);
                         }
+
                         @if (!string.IsNullOrEmpty(audioSource))
                         {
-                            <div class="audio-container">
-                                <audio controls preload="none">
-                                    <source src="@audioSource" />
-                                    Your browser does not support the audio element.
-                                </audio>
-                            </div>
+                            <audio controls preload="none">
+                                <source src="@audioSource" />
+                            </audio>
                         }
                         else
                         {
-                            <p class="no-audio">No audio data available</p>
+                            <p>No audio data available</p>
                         }
+
+                        <button @onclick="() => DeleteSong(song.songID)">
+                            Delete
+                        </button>
                     </div>
                 }
             }
@@ -68,6 +90,7 @@ else
 
         <div class="profile-section">
             <h2>Playlists</h2>
+
             @if (UserPlaylists == null || UserPlaylists.Count == 0)
             {
                 <p>No playlists created</p>
@@ -77,17 +100,33 @@ else
                 @foreach (Playlist playlist in UserPlaylists)
                 {
                     <div class="playlist-card">
-                        <h4><a href="/playlist/@playlist.playlistid">@playlist.name</a></h4>
-                        <p>Status: @(playlist.ispublic ? "Public" : "Private")</p>
+                        <h4>
+                            <a href="/playlist/@playlist.playlistid">
+                                @playlist.name
+                            </a>
+                        </h4>
+
+                        <p>
+                            Status:
+                            @if (playlist.ispublic)
+                            {
+                                <span>Public</span>
+                            }
+                            else
+                            {
+                                <span>Private</span>
+                            }
+                        </p>
                     </div>
                 }
             }
         </div>
 
         <div class="profile-actions">
-            <button @onclick="GoUpload" class="btn">Upload Song</button>
-            <button @onclick="Logout" class="btn btn-secondary">Logout</button>
+            <button @onclick="GoUpload">Upload Song</button>
+            <button @onclick="Logout">Logout</button>
         </div>
+
     </div>
 }
 
@@ -99,39 +138,67 @@ else
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         var result = await Storage.GetAsync<User>("user");
+
         if (result.Success && result.Value != null)
         {
             user = result.Value;
             await LoadUserData();
-            StateHasChanged();
         }
         else
         {
             user = null;
-            UserSongs = new List<Song>();
-            UserPlaylists = new List<Playlist>();
-            StateHasChanged();
+            UserSongs.Clear();
+            UserPlaylists.Clear();
         }
+
+        StateHasChanged();
     }
 
     private async Task LoadUserData()
     {
-        if (user == null) return;
-        
-        try
+        if (user == null)
         {
-            DBL.SongDB songDB = new DBL.SongDB();
-            UserSongs = await songDB.SelectSongsByUserIDAsync(user.userid);
+            return;
+        }
 
-            DBL.PlaylistDB playlistDB = new DBL.PlaylistDB();
-            UserPlaylists = await playlistDB.GetUserPlaylistsAsync(user.userid);
-        }
-        catch (Exception ex)
+        SongDB songDB = new SongDB();
+        List<Song> songs = await songDB.SelectSongsByUserIDAsync(user.userid);
+
+        if (songs != null)
         {
-            // Handle error silently or log it
-            Console.WriteLine($"Error loading user data: {ex.Message}");
+            UserSongs = songs;
         }
+        else
+        {
+            UserSongs = new List<Song>();
+        }
+
+        PlaylistDB playlistDB = new PlaylistDB();
+        UserPlaylists = await playlistDB.GetUserPlaylistsAsync(user.userid);
     }
+
+    private async Task DeleteSong(int songId)
+    {
+        if (user == null)
+        {
+            return;
+        }
+
+        SongDB songDB = new SongDB();
+        await songDB.DeleteSongAsync(songId);
+
+        for (int i = 0; i < UserSongs.Count; i++)
+        {
+            if (UserSongs[i].songID == songId)
+            {
+                UserSongs.RemoveAt(i);
+                break;
+            }
+        }
+
+        StateHasChanged();
+    }
+
 
     private void GoUpload()
     {
@@ -146,34 +213,45 @@ else
 
     private async Task OnProfileImageSelected(InputFileChangeEventArgs e)
     {
+        if (user == null)
+        {
+            return;
+        }
+
         var file = e.File;
-        if (file == null || user == null) return;
-
-        try
+        if (file == null)
         {
-            using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
-            using var ms = new MemoryStream();
-            await stream.CopyToAsync(ms);
-
-            byte[] imageBytes = ms.ToArray();
-            user.profilepicture = imageBytes;
-
-            DBL.UserDB userDB = new DBL.UserDB();
-            await userDB.UpdateUserAsync(user.userid, new Dictionary<string, object> { { "profilepicture", imageBytes } });
-            
-            // Update storage with the new user data
-            await Storage.SetAsync("user", user);
-            StateHasChanged();
+            return;
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error uploading profile image: {ex.Message}");
-        }
+
+        using var stream = file.OpenReadStream(5 * 1024 * 1024);
+        using var ms = new MemoryStream();
+
+        await stream.CopyToAsync(ms);
+
+        byte[] imageBytes = ms.ToArray();
+        user.profilepicture = imageBytes;
+
+        UserDB userDB = new UserDB();
+        await userDB.UpdateUserAsync(
+            user.userid,
+            new Dictionary<string, object>
+            {
+                { "profilepicture", imageBytes }
+            }
+        );
+
+        await Storage.SetAsync("user", user);
+        StateHasChanged();
     }
 
     private string? GetProfileImage(byte[]? imageData)
     {
-        if (imageData == null || imageData.Length == 0) return null;
-        return $"data:image/png;base64,{Convert.ToBase64String(imageData)}";
+        if (imageData == null || imageData.Length == 0)
+        {
+            return null;
+        }
+
+        return "data:image/png;base64," + Convert.ToBase64String(imageData);
     }
 }

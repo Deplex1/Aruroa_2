@@ -2,21 +2,24 @@
 using System.IO;
 using TagLib;
 
-public static class AudioHelper
+namespace SongManagment
 {
-    public static int GetMp3DurationInSeconds(byte[] data)
+    public static class AudioHelper
     {
-        MemoryStream ms = new MemoryStream(data);
+        public static async Task<int> GetMp3DurationInSeconds(byte[] data)
+        {
+            MemoryStream ms = new MemoryStream(data);
 
-        StreamFileAbstraction file = new StreamFileAbstraction("audio.mp3", ms, ms);
+            StreamFileAbstraction file = new StreamFileAbstraction("audio.mp3", ms, ms);
 
-        TagLib.File tagFile = TagLib.File.Create(file);
+            TagLib.File tagFile = TagLib.File.Create(file);
 
-        TimeSpan duration = tagFile.Properties.Duration;
+            TimeSpan duration = tagFile.Properties.Duration;
 
-        tagFile.Dispose();
-        ms.Dispose();
+            tagFile.Dispose();
+            ms.Dispose();
 
-        return (int)duration.TotalSeconds;
+            return (int)duration.TotalSeconds;
+        }
     }
 }

@@ -194,5 +194,15 @@ namespace DBL
             await SelectAllAsync(sql, where);
         }
 
+        // Delete song by id
+        public async Task<int> DeleteSongAsync(int songId)
+        {
+            Dictionary<string, object> where = new Dictionary<string, object>
+            {
+                { "songid", songId }
+            };
+
+            return await DeleteAsync(where);
+        }
     }
 }

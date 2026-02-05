@@ -112,10 +112,13 @@ else
     // User information for ratings
     private User? currentUser;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool first)
     {
-        await LoadCurrentUser();
-        await LoadAllSongs();
+        if(first)
+        {
+            await LoadCurrentUser();
+            await LoadAllSongs();
+        }
     }
 
     private async Task LoadCurrentUser()
