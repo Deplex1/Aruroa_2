@@ -1,0 +1,62 @@
+@using DBL
+@using Models
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject NavigationManager Nav
+@inject ProtectedSessionStorage Storage
+
+<nav class="main-nav">
+    <div class="nav-brand">
+        <h3>Aurora Music</h3>
+    </div>
+    
+    <div class="nav-links">
+        <a href="/" class="nav-link @GetActiveClass("/")">Home</a>
+        <a href="/songs" class="nav-link @GetActiveClass("/songs")">Songs</a>
+        <a href="/upload" class="nav-link @GetActiveClass("/upload")">Upload</a>
+        <a href="/playlists" class="nav-link @GetActiveClass("/playlists")">Playlists</a>
+        <a href="/profile" class="nav-link @GetActiveClass("/profile")">Profile</a>
+    </div>
+    
+    <div class="nav-auth">
+        @if (user == null)
+        {
+            <a href="/login" class="nav-link nav-auth-btn">Login</a>
+            <a href="/register" class="nav-link nav-auth-btn">Register</a>
+        }
+        else
+        {
+            <span class="nav-user">Hello, @user.username</span>
+            <button @onclick="Logout" class="nav-link nav-auth-btn">Logout</button>
+        }
+    </div>
+</nav>
+
+@code {
+    private User user = null;
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        var result = await Storage.GetAsync<User>("user");
+        if (result.Success)
+        {
+            user = result.Value;
+            StateHasChanged();
+        }
+        else
+        {
+            user = null;
+            StateHasChanged();
+        }
+    }
+
+    private string GetActiveClass(string path)
+    {
+        return Nav.Uri.Contains(path) ? "active" : "";
+    }
+
+    private async Task Logout()
+    {
+        await Storage.DeleteAsync("userid");
+        Nav.NavigateTo("/login", true);
+    }
+}

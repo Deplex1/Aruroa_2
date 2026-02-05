@@ -1,122 +1,212 @@
 ﻿@page "/"
+
 @using DBL
+
 @using Models
+
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+
 @inject NavigationManager Nav
+
 @inject ProtectedSessionStorage Storage
 
 
 
-<h2>Aurora Music</h2>
 
-<div class="top-bar">
-    @if (user == null)
-    {
-        <button @onclick="GoLogin">Login</button>
-    }
-    else
-    {
-        <span>Hello @user.username</span>
-        <button @onclick="Logout">Logout</button>
-        <button @onclick="GoUpload">Upload Song</button>
-        <button @onclick="GoProfile">Profile</button>
-    }
-</div>
 
-<hr />
+
+
+<h1>Welcome to Aurora Music</h1>
+
+
 
 <h3>Popular Songs</h3>
 
+
+
 @if (popularSongs.Count == 0)
+
 {
+
     <p>No songs found.</p>
+
 }
+
 else
+
 {
+
     foreach (Song s in popularSongs)
+
     {
+
         <div class="song-card">
+
             <b>@s.title</b><br />
+
             Duration: @FormatTime(s.duration)<br />
+
             Plays: @s.plays<br />
+
             <button @onclick="() => GoSongs()">Open</button>
+
             <hr />
+
         </div>
+
     }
+
 }
+
+
 
 <h3>New Songs</h3>
 
+
+
 @if (newSongs.Count == 0)
+
 {
+
     <p>No songs found.</p>
-}
-else
-{
-    foreach (Song s in newSongs)
-    {
-        <div class="song-card">
-            <b>@s.title</b><br />
-            Duration: @FormatTime(s.duration)<br />
-            Uploaded: @s.uploaded<br />
-            <button @onclick="() => GoSongs()">Open</button>
-            <hr />
-        </div>
-    }
+
 }
 
-@code
+else
+
 {
+
+    foreach (Song s in newSongs)
+
+    {
+
+        <div class="song-card">
+
+            <b>@s.title</b><br />
+
+            Duration: @FormatTime(s.duration)<br />
+
+            Uploaded: @s.uploaded<br />
+
+            <button @onclick="() => GoSongs()">Open</button>
+
+            <hr />
+
+        </div>
+
+    }
+
+}
+
+
+
+@code
+
+{
+
     List<Song> popularSongs = new List<Song>();
+
     List<Song> newSongs = new List<Song>();
+
+
 
     User user = null;
 
+
+
     protected override async Task OnAfterRenderAsync(bool first)
+
     {
+
         var result = await Storage.GetAsync<User>("user");
+
         if (result.Success)
+
         {
+
             user = result.Value;
+
         }
+
+
 
         SongDB db = new SongDB();
 
+
+
         popularSongs = await db.GetPopularSongsAsync();
+
         newSongs = await db.GetNewSongsAsync();
+
         StateHasChanged();
+
     }
+
+
 
     void GoLogin()
+
     {
+
         Nav.NavigateTo("/login");
+
     }
+
+
 
     void GoUpload()
+
     {
+
         Nav.NavigateTo("/upload");
+
     }
+
+
 
     void GoProfile()
+
     {
+
         Nav.NavigateTo("/profile");
+
     }
+
+
 
     void GoSongs()
+
     {
+
         Nav.NavigateTo("/songs");
+
     }
+
+
 
     async Task Logout()
+
     {
+
         await Storage.DeleteAsync("userid");
+
         Nav.NavigateTo("/login", true);
+
     }
 
+
+
     string FormatTime(int seconds)
+
     {
+
         int min = seconds / 60;
+
         int sec = seconds % 60;
+
         return min + ":" + sec.ToString("D2");
+
     }
+
 }
+

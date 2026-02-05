@@ -6,81 +6,186 @@
 @inject NavigationManager Nav
 @inject ProtectedSessionStorage Storage
 
-<link rel="stylesheet" href="C:\Users\Twelve.DESKTOP-MG3L518\source\repos\Aruroa\AruroaBlazor\wwwroot\star.css" />
+<h1>Songs</h1>
 
-
-<h3>Songs</h3>
-
-
-<!-- Simple search input -->
-<input placeholder="Search song..." @bind="searchText" />
-<button @onclick="Search">Search</button>
+<!-- Search and Filter Section -->
+<div class="search-section">
+    <div class="search-controls">
+        <div class="search-input-group">
+            <input placeholder="Search songs by title..." @bind="searchText" @oninput="OnSearchInput" class="search-input" />
+            <button @onclick="Search" class="btn btn-search">Search</button>
+            <button @onclick="ClearSearch" class="btn btn-secondary">Clear</button>
+        </div>
+        
+        <div class="results-info">
+            @if (!string.IsNullOrEmpty(searchText))
+            {
+                <span>Found @songList.Count songs matching "@searchText"</span>
+            }
+            else
+            {
+                <span>All Songs (@songList.Count)</span>
+            }
+        </div>
+    </div>
+</div>
 
 <hr />
 
-@if (songList != null)
+<!-- Songs List -->
+@if (songList == null)
 {
-    foreach (Song song in songList)
-    {
-        <div>
-            <b>@song.title</b><br />
-
-            Duration: @FormatDuration(song.duration)<br />
-
-            <audio controls src="@song.GetAudioSource(song.audioData)"></audio>
-
-            <div class="star-rating">
-                @for (int i = 1; i <= 5; i++)
-                {
-                    <!-- show a filled star when appropriate -->
-                    <span class="star @(IsStarFilled(song.songID, i) ? "filled" : "")"
-                          @onmouseover="() => OnHover(song.songID, i)"
-                          @onmouseout="() => OnHover(song.songID, 0)"
-                          @onclick="() => OnClick(song.songID, i)">
-                        ★
-                    </span>
-                }
-            </div>
-
-            <hr />
-        </div>
-    }
+    <div class="loading">
+        <p>Loading songs...</p>
+    </div>
 }
+else if (songList.Count == 0)
+{
+    <div class="no-results">
+        <p>No songs found.</p>
+        @if (!string.IsNullOrEmpty(searchText))
+        {
+            <button @onclick="ClearSearch" class="btn btn-secondary">Show All Songs</button>
+        }
+    </div>
+}
+else
+{
+    <div class="songs-grid">
+        @foreach (Song song in songList)
+        {
+            <div class="song-card">
+                <div class="song-header">
+                    <h4>@song.title</h4>
+                    <div class="song-meta">
+                        <span class="duration">Duration: @FormatDuration(song.duration)</span>
+                        <span class="plays">Plays: @song.plays</span>
+                    </div>
+                </div>
+                
+                @{
+                    var audioSource = song.GetAudioSource(song.audioData);
+                }
+                @if (!string.IsNullOrEmpty(audioSource))
+                {
+                    <div class="audio-container">
+                        <audio controls preload="none" style="width: 100%;">
+                            <source src="@audioSource" />
+                            Your browser does not support the audio element.
+                        </audio>
+                        <div class="audio-debug">
+                            <small>Audio data size: @(song.audioData?.Length ?? 0) bytes</small>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <p class="no-audio">No audio data available</p>
+                }
 
-<button @onclick="GoUpload">Upload Song</button>
-<button @onclick="Logout">Logout</button>
+                <div class="song-actions">
+                    <div class="star-rating">
+                        @for (int i = 1; i <= 5; i++)
+                        {
+                            <span class="star @(IsStarFilled(song.songID, i) ? "filled" : "")"
+                                  @onmouseover="() => OnHover(song.songID, i)"
+                                  @onmouseout="() => OnHover(song.songID, 0)"
+                                  @onclick="() => OnClick(song.songID, i)">
+                                ★
+                            </span>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
 
 @code
 {
     // List of songs shown on the page
-    List<Song> songList = new List<Song>();
+    private List<Song> songList = new List<Song>();
 
     // Text the user types into the search box
-    string searchText = "";
+    private string searchText = "";
+    
+    // User information for ratings
+    private User? currentUser;
 
     protected override async Task OnInitializedAsync()
     {
-        // Load all songs when the page opens
-        SongDB db = new SongDB();
-        songList = await db.SelectAllSongsAsync();
+        await LoadCurrentUser();
+        await LoadAllSongs();
     }
 
-    // Search for songs by title (simple wrapper)
-    async Task Search()
+    private async Task LoadCurrentUser()
     {
-        SongDB db = new SongDB();
-        songList = await db.SearchSongsAsync(searchText);
+        var result = await Storage.GetAsync<User>("user");
+        if (result.Success)
+        {
+            currentUser = result.Value;
+            await LoadUserRatings();
+        }
+        else
+        {
+            currentUser = null;
+        }
+    }
+
+    // Load all songs when the page opens
+    private async Task LoadAllSongs()
+    {
+        try
+        {
+            SongDB db = new SongDB();
+            songList = await db.SelectAllSongsAsync();
+            await LoadUserRatings();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading songs: {ex.Message}");
+        }
+    }
+
+    // Real-time search as user types
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        searchText = e.Value?.ToString() ?? "";
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            await LoadAllSongs();
+        }
+    }
+
+    // Search for songs by title
+    private async Task Search()
+    {
+        try
+        {
+            SongDB db = new SongDB();
+            songList = await db.SearchSongsAsync(searchText.Trim());
+            await LoadUserRatings();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error searching songs: {ex.Message}");
+        }
+    }
+
+    // Clear search and show all songs
+    private async Task ClearSearch()
+    {
+        searchText = "";
+        await LoadAllSongs();
     }
 
     void GoUpload()
     {
-        // Navigate to the upload page
         Nav.NavigateTo("/upload");
     }
 
     async Task Logout()
     {
-        // Remove the saved user and go to the login page
         await Storage.DeleteAsync("user");
         Nav.NavigateTo("/login");
     }
@@ -93,44 +198,74 @@
         return minutes.ToString() + ":" + secs.ToString("00");
     }
 
-    //RATING
+    // RATING SYSTEM
 
     // stores the rating the user has clicked (songId -> value)
-    Dictionary<int, int> userRatings = new Dictionary<int, int>();
+    private Dictionary<int, int> userRatings = new Dictionary<int, int>();
 
     // stores the temporary hover preview (songId -> value)
-    Dictionary<int, int> previewRatings = new Dictionary<int, int>();
+    private Dictionary<int, int> previewRatings = new Dictionary<int, int>();
+
+    // Load user's existing ratings from database
+    private async Task LoadUserRatings()
+    {
+        if (currentUser == null) return;
+
+        try
+        {
+            RatingDB ratingDB = new RatingDB();
+            var ratings = await ratingDB.GetUserRatingsAsync(currentUser.userid);
+            
+            userRatings.Clear();
+            foreach (var rating in ratings)
+            {
+                userRatings[rating.songid] = rating.rating;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading user ratings: {ex.Message}");
+        }
+    }
 
     // Called when the mouse moves over or out of a star.
-    // If value is 0 we remove the preview so stale zeros don't stay.
     void OnHover(int songId, int value)
     {
         if (value > 0)
         {
-            Console.WriteLine("Mouse Hoverd!", songId);
             previewRatings[songId] = value;
         }
         else
         {
-            // remove preview when the mouse leaves the star area
             previewRatings.Remove(songId);
         }
-
         StateHasChanged();
     }
 
     // Called when the user clicks a star to pick a rating.
-    // Right now this only updates local UI state. You can later
-    // call a DB method here to save the rating permanently.
-    async Task OnClick(int songId, int value)
+    private async Task OnClick(int songId, int value)
     {
-        userRatings[songId] = value;
-        StateHasChanged();
+        if (currentUser == null)
+        {
+            // You could show a message here asking user to login
+            return;
+        }
+
+        try
+        {
+            RatingDB ratingDB = new RatingDB();
+            await ratingDB.SaveRatingAsync(currentUser.userid, songId, value);
+            
+            userRatings[songId] = value;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving rating: {ex.Message}");
+        }
     }
 
     // Decide if a star should look filled:
-    // - show preview if the mouse is over stars
-    // - otherwise show the saved user rating if present
     bool IsStarFilled(int songId, int starIndex)
     {
         if (previewRatings.ContainsKey(songId) && previewRatings[songId] > 0)

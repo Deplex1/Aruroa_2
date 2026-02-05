@@ -25,7 +25,13 @@ namespace DBL
             p.name = row[1].ToString();
             p.userid = int.Parse(row[2].ToString());
             p.ispublic = Convert.ToBoolean(row[3]);
-
+            
+            // Handle created field (might be null)
+            if (row.Length > 4 && row[4] != null && row[4] != DBNull.Value)
+            {
+                p.created = Convert.ToDateTime(row[4]);
+            }
+            
             return p;
         }
 
@@ -36,8 +42,15 @@ namespace DBL
             values.Add("name", playlist.name);
             values.Add("userid", playlist.userid);
             values.Add("ispublic", playlist.ispublic);
+            values.Add("created", DateTime.Now);
 
             return await InsertAsync(values);
+        }
+
+        // Alias for CreatePlaylistAsync to match the method name used in Playlists.razor
+        public async Task<int> AddPlaylistAsync(Playlist playlist)
+        {
+            return await CreatePlaylistAsync(playlist);
         }
 
         public async Task<List<Playlist>> GetUserPlaylistsAsync(int userId)

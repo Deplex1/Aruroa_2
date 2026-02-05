@@ -42,18 +42,58 @@ namespace DBL
                 insert.Add("userid", userId);
                 insert.Add("songid", songId);
                 insert.Add("rating", value);
+                insert.Add("daterated", DateTime.Now);
                 await InsertAsync(insert);
             }
             else
             {
                 Dictionary<string, object> fields = new Dictionary<string, object>();
                 fields.Add("rating", value);
+                fields.Add("daterated", DateTime.Now);
 
                 Dictionary<string, object> where = new Dictionary<string, object>();
                 where.Add("ratingid", list[0].ratingid);
 
                 await UpdateAsync(fields, where);
             }
+        }
+
+        // Save rating (alias for AddOrUpdateRatingAsync)
+        public async Task SaveRatingAsync(int userId, int songId, int value)
+        {
+            await AddOrUpdateRatingAsync(userId, songId, value);
+        }
+
+        // Get all ratings for a specific user
+        public async Task<List<Rating>> GetUserRatingsAsync(int userId)
+        {
+            string sql = "SELECT * FROM ratings WHERE userid=@u ORDER BY daterated DESC";
+            Dictionary<string, object> p = new Dictionary<string, object>();
+            p.Add("u", userId);
+
+            return await SelectAllAsync(sql, p);
+        }
+
+        // Get all ratings for a specific song
+        public async Task<List<Rating>> GetSongRatingsAsync(int songId)
+        {
+            string sql = "SELECT * FROM ratings WHERE songid=@s ORDER BY daterated DESC";
+            Dictionary<string, object> p = new Dictionary<string, object>();
+            p.Add("s", songId);
+
+            return await SelectAllAsync(sql, p);
+        }
+
+        // Get user's rating for a specific song
+        public async Task<Rating?> GetUserRatingForSongAsync(int userId, int songId)
+        {
+            string sql = "SELECT * FROM ratings WHERE userid=@u AND songid=@s";
+            Dictionary<string, object> p = new Dictionary<string, object>();
+            p.Add("u", userId);
+            p.Add("s", songId);
+
+            var list = await SelectAllAsync(sql, p);
+            return list.Count > 0 ? list[0] : null;
         }
 
         //public async Task<double> GetAverageRatingAsync(int songId)

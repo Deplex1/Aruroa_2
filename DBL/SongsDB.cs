@@ -24,18 +24,25 @@ namespace DBL
         }
         public async Task<int> AddSongAsync(Song song)
         {
-        // Create dictionary for DB insert
-        var values = new Dictionary<string, object>
-        {
-            { "title", song.title },
-            { "audioData", song.audioData },
-            { "userid", song.userid },
-            { "uploaded", song.uploaded }
-        };
+            // Create dictionary for DB insert
+            var values = new Dictionary<string, object>
+            {
+                { "title", song.title },
+                { "audioData", song.audioData },
+                { "userid", song.userid },
+                { "uploaded", song.uploaded },
+                { "genreid", song.genreID },
+                { "duration", song.duration },
+                { "plays", song.plays }
+            };
 
-        // Call the protected InsertAsync from BaseDB
-        return await InsertAsync(values);
-    }
+            Console.WriteLine($"=== DATABASE INSERT ===");
+            Console.WriteLine($"Inserting song: {song.title}");
+            Console.WriteLine($"Fields: title, audioData, userid, uploaded, genreid, duration, plays");
+
+            // Call the protected InsertAsync from BaseDB
+            return await InsertAsync(values);
+        }
 
         // Get one song by ID (generic SelectById style)
         public async Task<Song> SelectByIdAsync(int id)
@@ -105,10 +112,15 @@ namespace DBL
         // Search by title
         public async Task<List<Song>> SearchSongsAsync(string text)
         {
-            string sql = "SELECT * FROM songs WHERE title LIKE @t";
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return await SelectAllSongsAsync();
+            }
+
+            string sql = "SELECT * FROM songs WHERE title LIKE @t ORDER BY title";
 
             Dictionary<string, object> p = new Dictionary<string, object>();
-            p.Add("t", text);
+            p.Add("t", $"%{text}%");
 
             return await SelectAllAsync(sql, p);
         }
