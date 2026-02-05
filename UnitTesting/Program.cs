@@ -10,6 +10,5 @@ public class Prgoram
 {
     public static void Main(string[] args)
     {
-        TestAudioHelper.TestFromFile();
     }
 }

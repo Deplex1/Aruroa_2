@@ -109,5 +109,12 @@ namespace DBL
             await UpdateSongPositionAsync(playlistId, songId1, s2.position);
             await UpdateSongPositionAsync(playlistId, songId2, tempPos);
         }
+
+        // Get the total number of songs in a playlist
+        public async Task<int> GetSongCountAsync(int playlistId)
+        {
+            var songs = await GetSongsInPlaylistAsync(playlistId);
+            return songs.Count;
+        }
     }
 }
