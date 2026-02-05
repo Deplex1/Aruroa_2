@@ -20,7 +20,7 @@ else
         <div class="playlist-header">
             <h1>@playlist.name</h1>
             <div class="playlist-meta">
-                <span>@(playlist.ispublic ? "🌐 Public" : "🔒 Private")</span>
+                <span>@(playlist.ispublic ? "Public" : "Private")</span>
                 <span>@songs.Count songs</span>
                 @if (playlist.created.HasValue)
                 {
@@ -29,17 +29,13 @@ else
             </div>
         </div>
 
-        <!-- Playlist Controls -->
+        <!-- Controls -->
         <div class="playlist-controls">
-            <button @onclick="PlayAll" class="btn btn-primary">
-                <span>▶️ Play All</span>
-            </button>
+            <button @onclick="PlayAll" class="btn btn-primary">Play All</button>
             <button @onclick="ToggleAddSongs" class="btn btn-secondary">
-                <span>@(ShowAddSongs ? "✖️ Cancel" : "➕ Add Songs")</span>
+                @(ShowAddSongs ? "Cancel" : "Add Songs")
             </button>
-            <button @onclick="Shuffle" class="btn btn-secondary">
-                <span>🔀 Shuffle</span>
-            </button>
+            <button @onclick="Shuffle" class="btn btn-secondary">Shuffle</button>
         </div>
 
         @if (!string.IsNullOrEmpty(message))
@@ -49,35 +45,26 @@ else
             </div>
         }
 
-        <!-- Add Songs Section -->
+        <!-- Add Songs -->
         @if (ShowAddSongs)
         {
             <div class="add-songs-section">
-                <h3>Add Songs to Playlist</h3>
-                
-                <!-- Search Box -->
+                <h3>Add Songs</h3>
                 <div class="song-search">
-                    <input placeholder="Search available songs..." @bind="songSearchText" @oninput="OnSongSearchInput" class="song-search-input" />
-                    @if (!string.IsNullOrEmpty(songSearchText))
-                    {
-                        <button @onclick="ClearSongSearch" class="btn btn-small btn-secondary">Clear</button>
-                    }
+                    <input placeholder="Search..." @bind="songSearchText" @oninput="OnSongSearchInput" />
+                    <button @onclick="ClearSongSearch" disabled="@string.IsNullOrEmpty(songSearchText)">Clear</button>
                 </div>
-                
+
                 <div class="song-selector">
-                    <select @bind="selectedSongId" class="song-select">
+                    <select @bind="selectedSongId">
                         <option value="0">-- Select a song --</option>
-                        @foreach (var availableSong in filteredSongs)
+                        @foreach (var s in filteredSongs)
                         {
-                            <option value="@availableSong.songID">@availableSong.title</option>
+                            <option value="@s.songID">@s.title</option>
                         }
                     </select>
-                    <button @onclick="AddSongToPlaylist" class="btn btn-secondary" disabled="@(selectedSongId == 0 || isAddingSong)">
-                        Add to Playlist
-                    </button>
-                    <button @onclick="ToggleAddSongs" class="btn btn-danger">
-                        Cancel
-                    </button>
+                    <button @onclick="AddSongToPlaylist" disabled="@(selectedSongId == 0 || isAddingSong)">Add</button>
+                    <button @onclick="ToggleAddSongs">Cancel</button>
                 </div>
             </div>
         }
@@ -85,9 +72,7 @@ else
         <!-- Songs List -->
         @if (songs.Count == 0)
         {
-            <div class="no-songs">
-                <p>No songs in this playlist.</p>
-            </div>
+            <p>No songs in this playlist.</p>
         }
         else
         {
@@ -99,37 +84,23 @@ else
                             <h4>@song.title</h4>
                             <p>Duration: @FormatDuration(song.duration)</p>
                         </div>
-                        
-                        @{
-                            var audioSource = song.GetAudioSource(song.audioData);
-                        }
-                        @if (!string.IsNullOrEmpty(audioSource))
+
+                        @if (!string.IsNullOrEmpty(song.GetAudioSource(song.audioData)))
                         {
-                            <div class="audio-container">
-                                <audio controls preload="none" @ref="currentAudioElement">
-                                    <source src="@audioSource" />
-                                    Your browser does not support the audio element.
-                                </audio>
-                            </div>
+                            <audio controls preload="none" @ref="currentAudioElement">
+                                <source src="@song.GetAudioSource(song.audioData)" />
+                            </audio>
                         }
                         else
                         {
-                            <p class="no-audio">No audio data available</p>
+                            <p>No audio data available</p>
                         }
 
                         <div class="song-actions">
-                            <button @onclick="() => PlaySong(song)" class="btn btn-small btn-primary">
-                                ▶️
-                            </button>
-                            <button @onclick="() => MoveUp(song)" class="btn btn-small" disabled="@(songs.IndexOf(song) == 0)">
-                                ⬆️
-                            </button>
-                            <button @onclick="() => MoveDown(song)" class="btn btn-small" disabled="@(songs.IndexOf(song) == songs.Count - 1)">
-                                ⬇️
-                            </button>
-                            <button @onclick="() => RemoveSong(song)" class="btn btn-small btn-danger">
-                                🗑️
-                            </button>
+                            <button @onclick="@(() => PlaySong(song))">▶</button>
+                            <button @onclick="@(() => MoveUp(song))" disabled="@(songs.IndexOf(song) == 0)">⬆</button>
+                            <button @onclick="@(() => MoveDown(song))" disabled="@(songs.IndexOf(song) == songs.Count - 1)">⬇</button>
+                            <button @onclick="@(() => RemoveSong(song))">Delete</button>
                         </div>
                     </div>
                 }
@@ -146,35 +117,29 @@ else
     private Playlist? playlist;
     private List<Song> songs = new List<Song>();
     private List<Song> allSongs = new List<Song>();
+    private List<Song> filteredSongs = new List<Song>();
     private bool ShowAddSongs = false;
     private int selectedSongId = 0;
     private string songSearchText = "";
-    private List<Song> filteredSongs = new List<Song>();
     private string message = "";
     private bool isAddingSong = false;
-    
-    // Audio playback
+
     private ElementReference currentAudioElement;
     private int? currentPlayingIndex = null;
-    private bool isPlaying = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        var userResult = await Storage.GetAsync<User>("user");
-        if (userResult.Success)
-        {
-            user = userResult.Value;
-        }
-        else
-        {
-            user = null;
-            StateHasChanged();
-            return;
-        }
+        if (!firstRender) return;
 
-        await LoadPlaylist();
-        await LoadAllSongs();
-        StateHasChanged();
+        var result = await Storage.GetAsync<User>("user");
+        user = result.Success ? result.Value : null;
+
+        if (user != null)
+        {
+            await LoadPlaylist();
+            await LoadAllSongs();
+            StateHasChanged();
+        }
     }
 
     private async Task LoadPlaylist()
@@ -186,24 +151,19 @@ else
 
             if (playlist == null)
             {
-                StateHasChanged();
+                songs.Clear();
                 return;
             }
 
-            // Load songs in playlist
-            PlaylistSongDB playlistSongDB = new PlaylistSongDB();
-            List<PlaylistSong> playlistSongs = await playlistSongDB.GetSongsInPlaylistAsync(id);
+            PlaylistSongDB psDB = new PlaylistSongDB();
+            var playlistSongs = await psDB.GetSongsInPlaylistAsync(id);
 
             SongDB songDB = new SongDB();
-            songs = new List<Song>();
-
-            foreach (PlaylistSong ps in playlistSongs.OrderBy(s => s.position))
+            songs.Clear();
+            foreach (var ps in playlistSongs.OrderBy(x => x.position))
             {
-                Song song = await songDB.SelectByIdAsync(ps.songid);
-                if (song != null)
-                {
-                    songs.Add(song);
-                }
+                var song = await songDB.SelectByIdAsync(ps.songid);
+                if (song != null) songs.Add(song);
             }
         }
         catch (Exception ex)
@@ -218,72 +178,11 @@ else
         {
             SongDB songDB = new SongDB();
             allSongs = await songDB.SelectAllSongsAsync();
-            FilterSongs(); // Initialize filtered songs
+            FilterSongs();
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error loading all songs: {ex.Message}");
-        }
-    }
-
-    private async Task AddSongToPlaylist()
-    {
-        if (selectedSongId == 0) return;
-        if (isAddingSong) return;
-        isAddingSong = true;
-
-        try
-        {
-            PlaylistSongDB playlistSongDB = new PlaylistSongDB();
-            bool exists = await playlistSongDB.SongExistsInPlaylistAsync(id, selectedSongId);
-            if (exists)
-            {
-                selectedSongId = 0;
-                message = "Song is already in this playlist.";
-                return;
-            }
-            int nextPosition = songs.Count + 1;
-            
-            int rows = await playlistSongDB.AddSongToPlaylistAsync(id, selectedSongId, nextPosition);
-            if (rows != 1)
-            {
-                message = "Error adding song to playlist.";
-                return;
-            }
-            
-            await LoadPlaylist();
-            selectedSongId = 0;
-            ShowAddSongs = false;
-            FilterSongs();
-            message = "Song added to playlist successfully!";
-            
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error adding song to playlist: {ex.Message}");
-            message = $"Error adding song to playlist: {ex.Message}";
-        }
-        finally
-        {
-            isAddingSong = false;
-            StateHasChanged();
-        }
-    }
-
-    private async Task RemoveSong(Song song)
-    {
-        try
-        {
-            PlaylistSongDB playlistSongDB = new PlaylistSongDB();
-            await playlistSongDB.RemoveSongFromPlaylistAsync(id, song.songID);
-            
-            await LoadPlaylist();
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error removing song from playlist: {ex.Message}");
         }
     }
 
@@ -292,14 +191,12 @@ else
         ShowAddSongs = !ShowAddSongs;
         if (ShowAddSongs)
         {
-            // Reset search when opening
             songSearchText = "";
             FilterSongs();
         }
-        StateHasChanged();
     }
 
-    private async Task OnSongSearchInput(ChangeEventArgs e)
+    private void OnSongSearchInput(ChangeEventArgs e)
     {
         songSearchText = e.Value?.ToString() ?? "";
         FilterSongs();
@@ -313,124 +210,128 @@ else
 
     private void FilterSongs()
     {
-        if (string.IsNullOrWhiteSpace(songSearchText))
+        filteredSongs = allSongs
+            .Where(s => !songs.Any(ps => ps.songID == s.songID))
+            .Where(s => string.IsNullOrWhiteSpace(songSearchText) || s.title.Contains(songSearchText, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    private async Task AddSongToPlaylist()
+    {
+        if (selectedSongId == 0 || isAddingSong) return;
+        isAddingSong = true;
+
+        try
         {
-            filteredSongs = allSongs.Where(s => !songs.Any(ps => ps.songID == s.songID)).ToList();
+            PlaylistSongDB psDB = new PlaylistSongDB();
+
+            bool exists = await psDB.SongExistsInPlaylistAsync(id, selectedSongId);
+            if (exists)
+            {
+                message = "Song is already in playlist";
+                return;
+            }
+
+            int nextPos = await psDB.GetMaxPositionInPlaylistAsync(id) + 1;
+            int rows = await psDB.AddSongToPlaylistAsync(id, selectedSongId, nextPos);
+
+            if (rows == 1)
+            {
+                await LoadPlaylist();
+                FilterSongs();
+                message = "Song added successfully";
+            }
+            else
+            {
+                message = "Error adding song";
+            }
+
+            selectedSongId = 0;
+            ShowAddSongs = false;
         }
-        else
+        finally
         {
-            filteredSongs = allSongs
-                .Where(s => !songs.Any(ps => ps.songID == s.songID))
-                .Where(s => s.title.Contains(songSearchText, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            isAddingSong = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RemoveSong(Song song)
+    {
+        try
+        {
+            PlaylistSongDB psDB = new PlaylistSongDB();
+            await psDB.RemoveSongFromPlaylistAsync(id, song.songID);
+
+            // Optionally delete from DB completely
+            SongDB songDB = new SongDB();
+            await songDB.DeleteSongAsync(song.songID);
+
+            await LoadPlaylist();
+            FilterSongs();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error removing song: {ex.Message}");
         }
     }
 
     private async Task MoveUp(Song song)
     {
-        int currentIndex = songs.IndexOf(song);
-        if (currentIndex <= 0) return;
+        int index = songs.IndexOf(song);
+        if (index <= 0) return;
 
-        try
-        {
-            PlaylistSongDB playlistSongDB = new PlaylistSongDB();
-            
-            // Update positions
-            await playlistSongDB.UpdateSongPositionAsync(id, song.songID, currentIndex);
-            await playlistSongDB.UpdateSongPositionAsync(id, songs[currentIndex - 1].songID, currentIndex + 1);
-            
-            await LoadPlaylist();
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error moving song: {ex.Message}");
-        }
+        PlaylistSongDB psDB = new PlaylistSongDB();
+        await psDB.SwapSongPositionsAsync(id, songs[index].songID, songs[index - 1].songID);
+
+        await LoadPlaylist();
     }
 
     private async Task MoveDown(Song song)
     {
-        int currentIndex = songs.IndexOf(song);
-        if (currentIndex >= songs.Count - 1) return;
+        int index = songs.IndexOf(song);
+        if (index >= songs.Count - 1) return;
 
-        try
-        {
-            PlaylistSongDB playlistSongDB = new PlaylistSongDB();
-            
-            // Update positions
-            await playlistSongDB.UpdateSongPositionAsync(id, song.songID, currentIndex + 2);
-            await playlistSongDB.UpdateSongPositionAsync(id, songs[currentIndex + 1].songID, currentIndex + 1);
-            
-            await LoadPlaylist();
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error moving song: {ex.Message}");
-        }
+        PlaylistSongDB psDB = new PlaylistSongDB();
+        await psDB.SwapSongPositionsAsync(id, songs[index].songID, songs[index + 1].songID);
+
+        await LoadPlaylist();
     }
 
     private async Task PlaySong(Song song)
     {
-        int index = songs.IndexOf(song);
-        currentPlayingIndex = index;
-        await PlayCurrentSong();
+        currentPlayingIndex = songs.IndexOf(song);
+        StateHasChanged();
     }
 
     private async Task PlayAll()
     {
         if (songs.Count == 0) return;
-        
         currentPlayingIndex = 0;
-        await PlayCurrentSong();
-    }
-
-    private async Task PlayCurrentSong()
-    {
-        if (currentPlayingIndex == null || currentPlayingIndex >= songs.Count) return;
-
-        try
-        {
-            // For now, we'll just update the UI state
-            // JavaScript interop would be needed to control the audio element
-            isPlaying = true;
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error playing song: {ex.Message}");
-        }
+        StateHasChanged();
     }
 
     private async Task Shuffle()
     {
         if (songs.Count == 0) return;
 
-        try
+        Random rnd = new Random();
+        songs = songs.OrderBy(x => rnd.Next()).ToList();
+
+        PlaylistSongDB psDB = new PlaylistSongDB();
+        for (int i = 0; i < songs.Count; i++)
         {
-            Random random = new Random();
-            List<Song> shuffled = songs.OrderBy(x => random.Next()).ToList();
-            songs = shuffled;
-            
-            // Update positions in database
-            PlaylistSongDB playlistSongDB = new PlaylistSongDB();
-            for (int i = 0; i < shuffled.Count; i++)
-            {
-                await playlistSongDB.UpdateSongPositionAsync(id, shuffled[i].songID, i + 1);
-            }
-            
-            StateHasChanged();
+            await psDB.UpdateSongPositionAsync(id, songs[i].songID, i + 1);
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error shuffling playlist: {ex.Message}");
-        }
-    }   
+
+        StateHasChanged();
+    }
 
     private string FormatDuration(int seconds)
     {
-        int minutes = seconds / 60;
-        int secs = seconds % 60;
-        return $"{minutes}:{secs:D2}";
+        int min = seconds / 60;
+        int sec = seconds % 60;
+        return $"{min}:{sec:D2}";
     }
 }
