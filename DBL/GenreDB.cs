@@ -28,5 +28,15 @@ namespace DBL
         {
             return await SelectAllAsync();
         }
+
+        public async Task<int> AddGenreAsync(string name)
+        {
+            Dictionary<string, object> values = new Dictionary<string, object>();
+            values.Add("name", name);
+
+            int rows = await InsertAsync(values);
+
+            return rows;
+        }
     }
 }

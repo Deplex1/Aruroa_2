@@ -8,15 +8,24 @@
     <div class="nav-brand">
         <h3>Aurora Music</h3>
     </div>
-    
+
     <div class="nav-links">
         <a href="/" class="nav-link @GetActiveClass("/")">Home</a>
         <a href="/songs" class="nav-link @GetActiveClass("/songs")">Songs</a>
         <a href="/upload" class="nav-link @GetActiveClass("/upload")">Upload</a>
         <a href="/playlists" class="nav-link @GetActiveClass("/playlists")">Playlists</a>
         <a href="/profile" class="nav-link @GetActiveClass("/profile")">Profile</a>
+
+        @* Admin link only visible if user is admin *@
+        @if (user != null)
+        {
+            if (user.IsAdmin == 1)
+            {
+                <a href="/adminDashboard" class="nav-link @GetActiveClass("/adminDashboard")">Admin Dashboard</a>
+            }
+        }
     </div>
-    
+
     <div class="nav-auth">
         @if (user == null)
         {
@@ -56,7 +65,7 @@
 
     private async Task Logout()
     {
-        await Storage.DeleteAsync("userid");
+        await Storage.DeleteAsync("user"); // delete the key that actually stores the user object
         Nav.NavigateTo("/login", true);
     }
 }

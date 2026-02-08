@@ -1,0 +1,150 @@
+﻿@page "/admin/genres"
+
+@using Models
+@using DBL
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject ProtectedSessionStorage Storage
+@inject NavigationManager Nav
+
+<h3>Genre Administration</h3>
+
+@if (user == null)
+{
+    <p>You must be logged in.</p>
+}
+else if (user.IsAdmin == 0)
+{
+    <p>You do not have permission to view this page.</p>
+}
+else
+{
+    <div>
+
+        <h4>Add Genre</h4>
+
+        <input placeholder="Genre name"
+               @bind="newGenreName" />
+
+        <button @onclick="AddGenre"
+                disabled="@isSaving">
+            Add
+        </button>
+
+        @if (message != "")
+        {
+            <p>@message</p>
+        }
+
+        <hr />
+
+        <h4>Existing Genres</h4>
+
+        @if (genres.Count == 0)
+        {
+            <p>No genres found.</p>
+        }
+        else
+        {
+            <ul>
+                @for (int i = 0; i < genres.Count; i++)
+                {
+                    <li>@genres[i].name</li>
+                }
+            </ul>
+        }
+
+    </div>
+}
+
+@code
+{
+    private User? user;
+    private List<Genre> genres = new List<Genre>();
+
+    private string newGenreName = "";
+    private string message = "";
+    private bool isSaving = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender == false)
+        {
+            return;
+        }
+
+        var result = await Storage.GetAsync<User>("user");
+
+        if (result.Success == true)
+        {
+            user = result.Value;
+        }
+        else
+        {
+            user = null;
+        }
+
+        if (user != null && user.IsAdmin == 1)
+        {
+            await LoadGenres();
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task LoadGenres()
+    {
+        GenreDB genreDB = new GenreDB();
+
+        List<Genre> dbGenres = await genreDB.SelectAllGenresAsync();
+
+        genres.Clear();
+
+        for (int i = 0; i < dbGenres.Count; i++)
+        {
+            genres.Add(dbGenres[i]);
+        }
+    }
+
+    private async Task AddGenre()
+    {
+        if (isSaving == true)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newGenreName))
+        {
+            message = "Genre name cannot be empty";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            GenreDB genreDB = new GenreDB();
+
+            int rows = await genreDB.AddGenreAsync(newGenreName);
+
+            if (rows == 1)
+            {
+                message = "Genre added successfully";
+                newGenreName = "";
+                await LoadGenres();
+            }
+            else
+            {
+                message = "Failed to add genre";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = "Error: " + ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+}

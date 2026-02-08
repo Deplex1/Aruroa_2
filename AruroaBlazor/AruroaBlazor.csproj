@@ -20,8 +20,4 @@
     <ProjectReference Include="..\SongManagment\SongManagment.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Components\Pages\Admin\" />
-  </ItemGroup>
-
 </Project>
