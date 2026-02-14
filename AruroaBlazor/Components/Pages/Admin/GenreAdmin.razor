@@ -679,34 +679,35 @@
 
         try
         {
-            // NOTE: This will fail if there are songs using this genre
-            // due to foreign key constraints in song_genres table
-            // That's actually GOOD - it prevents data corruption!
-
             GenreDB genreDB = new GenreDB();
 
-            // We need to add a delete method to GenreDB
-            // For now, we'll use the base delete functionality
-            Dictionary<string, object> filter = new Dictionary<string, object>();
-            filter.Add("genreid", genreToDelete.genreid);
+            // Call the method YOU created in GenreDB
+            int rowsAffected = await genreDB.DeleteGenreAsync(genreToDelete.genreid);
 
-            // This won't work because DeleteAsync is protected!
-            // We need to add a public method in GenreDB
-
-            ShowMessage("Delete functionality needs to be implemented in GenreDB", "warning");
-
-            // TODO: Add DeleteGenreAsync method to GenreDB.cs
-        }
-        catch (Exception ex)
-        {
-            if (ex.Message.Contains("foreign key") || ex.Message.Contains("constraint"))
+            if (rowsAffected > 0)
             {
-                ShowMessage("Cannot delete '" + genreToDelete.name + "' - it is being used by existing songs!", "error");
+                ShowMessage("Genre '" + genreToDelete.name + "' deleted successfully!", "success");
+
+                // Remove it from the local list so UI updates immediately
+                for (int i = 0; i < genres.Count; i++)
+                {
+                    if (genres[i].genreid == genreToDelete.genreid)
+                    {
+                        genres.RemoveAt(i);
+                        break;
+                    }
+                }
             }
             else
             {
-                ShowMessage("Error deleting genre: " + ex.Message, "error");
+                ShowMessage("Genre could not be deleted.", "error");
             }
+        }
+        catch (Exception ex)
+        {
+            // This usually means FK constraint (genre used by songs)
+            ShowMessage("Cannot delete genre because it is used by songs.", "error");
+            Console.WriteLine(ex.Message);
         }
         finally
         {
@@ -715,6 +716,7 @@
             StateHasChanged();
         }
     }
+
 
     // Handle Enter key press in input field
     private async Task HandleKeyPress(KeyboardEventArgs e)
