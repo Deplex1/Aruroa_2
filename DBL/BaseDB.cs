@@ -249,7 +249,7 @@ namespace DBL
         /// <param name="query">SQL string</param>
         /// <example>DELETE FROM Customers WHERE CustomerID = 17</example>
         /// <returns>The number of rows affected.</returns>
-        private async Task<int> ExecNonQueryAsync(string query)
+        protected async Task<int> ExecNonQueryAsync(string query)
         {
             if (String.IsNullOrEmpty(query))
                 return 0;
@@ -275,7 +275,7 @@ namespace DBL
         /// </summary>
         /// <param name="query">SQL string</param>
         /// <returns>The first column of the first row in the result set, or a null.</returns>
-        private async Task<object> ExecScalarAsync(string query)
+        protected async Task<object> ExecScalarAsync(string query)
         {
             if (String.IsNullOrEmpty(query))
                 return null;

@@ -1,4 +1,5 @@
 ﻿using Models;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -16,35 +17,30 @@ namespace DBL
             return "songid";
         }
 
-        //get all songs
         public async Task<List<Song>> SelectAllSongsAsync()
         {
-            
-            return await base.SelectAllAsync(); 
+            return await base.SelectAllAsync();
         }
+
         public async Task<int> AddSongAsync(Song song)
         {
-            // Create dictionary for DB insert
             var values = new Dictionary<string, object>
             {
                 { "title", song.title },
                 { "audioData", song.audioData },
                 { "userid", song.userid },
                 { "uploaded", song.uploaded },
-                { "genreid", song.genreID },
                 { "duration", song.duration },
                 { "plays", song.plays }
             };
 
             Console.WriteLine($"=== DATABASE INSERT ===");
             Console.WriteLine($"Inserting song: {song.title}");
-            Console.WriteLine($"Fields: title, audioData, userid, uploaded, genreid, duration, plays");
+            Console.WriteLine($"Fields: title, audioData, userid, uploaded, duration, plays");
 
-            // Call the protected InsertAsync from BaseDB
             return await InsertAsync(values);
         }
 
-        // Get one song by ID (generic SelectById style)
         public async Task<Song> SelectByIdAsync(int id)
         {
             Dictionary<string, object> parameters = new Dictionary<string, object>
@@ -59,57 +55,38 @@ namespace DBL
 
             return null;
         }
+
         protected async override Task<Song> CreateModelAsync(object[] row)
         {
             Song s = new Song();
 
-            // songid
             s.songID = int.Parse(row[0].ToString());
-
-            // title
             s.title = row[1].ToString();
-
-           
-            // duration 
             s.duration = int.Parse(row[2].ToString());
-            
-
-            // audioData (BLOB)
             s.audioData = (byte[])row[3];
-            
-
-            // userid
             s.userid = int.Parse(row[4].ToString());
 
-            // genreid
-            s.genreID = int.Parse(row[5].ToString());
-
-            DateTime time = new DateTime();
-
-            if (row[6] != null)
+            if (row[5] != null)
             {
-                s.uploaded = DateTime.Parse(row[6].ToString());
+                s.uploaded = DateTime.Parse(row[5].ToString());
             }
             else
             {
                 s.uploaded = DateTime.Now;
             }
 
-            if (row[7] != null)
+            if (row[6] != null)
             {
-                s.plays = int.Parse(row[7].ToString());
+                s.plays = int.Parse(row[6].ToString());
             }
             else
             {
                 s.plays = 0;
             }
-                return s;
+
+            return s;
         }
 
-        
-        
-
-        // Search by title
         public async Task<List<Song>> SearchSongsAsync(string text)
         {
             if (string.IsNullOrWhiteSpace(text))
@@ -140,7 +117,6 @@ namespace DBL
             return null;
         }
 
-        // Get one song by id
         public async Task<Song> SelectSingleSongAsync(int id)
         {
             Dictionary<string, object> p = new Dictionary<string, object>();
@@ -156,7 +132,6 @@ namespace DBL
             return null;
         }
 
-        // Insert new song (BLOB + duration)
         public async Task<Song> InsertSongAsync(Song s)
         {
             Dictionary<string, object> values = new Dictionary<string, object>();
@@ -165,7 +140,6 @@ namespace DBL
             values.Add("duration", s.duration);
             values.Add("audioData", s.audioData);
             values.Add("userid", s.userid);
-            values.Add("genreid", s.genreID);
 
             return await InsertGetObjAsync(values);
         }
@@ -182,19 +156,32 @@ namespace DBL
             return await SelectAllAsync(sql);
         }
 
+        // This method increments the play count by 1 whenever a song is played
+        // We use a direct SQL UPDATE statement to increment the counter
         public async Task AddPlayAsync(int songId)
         {
-            Dictionary<string, object> fields = new Dictionary<string, object>();
-            fields.Add("plays", "plays + 1"); // special handling later
-
-            Dictionary<string, object> where = new Dictionary<string, object>();
-            where.Add("songid", songId);
-
+            // Create the UPDATE query
+            // plays + 1 means: take the current value and add 1 to it
             string sql = "UPDATE songs SET plays = plays + 1 WHERE songid = @songid";
-            await SelectAllAsync(sql, where);
+
+            // Create parameters dictionary to safely pass the songid
+            // This prevents SQL injection attacks
+            Dictionary<string, object> parameters = new Dictionary<string, object>();
+            parameters.Add("songid", songId);
+
+            // Add parameters to the command
+            // We need to manually add them because ExecNonQueryAsync doesn't do it
+            cmd.Parameters.Clear();
+            var param = cmd.CreateParameter();
+            param.ParameterName = "@songid";
+            param.Value = songId;
+            cmd.Parameters.Add(param);
+
+            // Execute the UPDATE query
+            // ExecNonQueryAsync returns the number of rows affected (should be 1)
+            await ExecNonQueryAsync(sql);
         }
 
-        // Delete song by id
         public async Task<int> DeleteSongAsync(int songId)
         {
             Dictionary<string, object> where = new Dictionary<string, object>

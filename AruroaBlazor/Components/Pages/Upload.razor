@@ -20,18 +20,27 @@ else
             <label for="title">Song Title</label>
             <input id="title" placeholder="Enter song title" @bind="title" />
         </div>
-        
+
         <div class="form-group">
-            <label for="genre">Genre</label>
-            <select id="genre" @bind="selectedGenreId">
-                <option value="0">Select a genre</option>
-                @foreach (var genre in availableGenres)
+            <label>Genres (Select multiple)</label>
+            <div class="genre-checkboxes">
+                @for (int i = 0; i < availableGenres.Count; i++)
                 {
-                    <option value="@genre.genreid">@genre.name</option>
+                    int index = i;
+                    Genre currentGenre = availableGenres[index];
+                    bool isChecked = IsGenreSelected(currentGenre.genreid);
+
+                    <div class="genre-checkbox-item">
+                        <input type="checkbox"
+                               id="genre-@currentGenre.genreid"
+                               checked="@isChecked"
+                               @onchange="(e) => ToggleGenre(currentGenre.genreid, e)" />
+                        <label for="genre-@currentGenre.genreid">@currentGenre.name</label>
+                    </div>
                 }
-            </select>
+            </div>
         </div>
-        
+
         <div class="form-group">
             <label for="audioFile">Audio File</label>
             <InputFile id="audioFile" OnChange="OnFileSelected" accept="audio/*" />
@@ -40,7 +49,7 @@ else
                 <p class="file-info">Selected: @selectedFile.Name (@FormatFileSize(selectedFile.Size))</p>
             }
         </div>
-        
+
         <button @onclick="UploadSong" disabled="@(isUploading)" class="btn">
             @if (isUploading)
             {
@@ -51,7 +60,7 @@ else
                 <span>Upload Song</span>
             }
         </button>
-        
+
         @if (!string.IsNullOrEmpty(message))
         {
             <div class="message @(message.Contains("success") ? "message-success" : "message-error")">
@@ -61,17 +70,50 @@ else
     </div>
 }
 
+<style>
+    .genre-checkboxes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-top: 10px;
+    }
+
+    .genre-checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .genre-checkbox-item input[type="checkbox"] {
+        cursor: pointer;
+    }
+
+    .genre-checkbox-item label {
+        cursor: pointer;
+        user-select: none;
+    }
+</style>
+
 @code {
     private User? user;
     private IBrowserFile? selectedFile;
     private string title = "";
     private string message = "";
     private bool isUploading = false;
-    private int selectedGenreId = 0;
+
+    // CHANGED: Instead of a single genre, we now track MULTIPLE selected genres
+    private List<int> selectedGenreIds = new List<int>();
     private List<Genre> availableGenres = new List<Genre>();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // Only load data on the FIRST render to avoid infinite loops
+        if (firstRender == false)
+        {
+            return;
+        }
+
+        // Check if user is logged in by reading from protected session storage
         var result = await Storage.GetAsync<User>("user");
         if (result.Success)
         {
@@ -87,6 +129,7 @@ else
         }
     }
 
+    // Load all available genres from the database
     private async Task LoadGenres()
     {
         try
@@ -100,125 +143,82 @@ else
         }
     }
 
+    // Check if a specific genre is currently selected
+    private bool IsGenreSelected(int genreId)
+    {
+        // Loop through selected genres to see if this one is checked
+        for (int i = 0; i < selectedGenreIds.Count; i++)
+        {
+            if (selectedGenreIds[i] == genreId)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Toggle a genre on/off when user clicks checkbox
+    private void ToggleGenre(int genreId, ChangeEventArgs e)
+    {
+        // Get the checkbox value (true = checked, false = unchecked)
+        bool isChecked = false;
+        if (e.Value != null)
+        {
+            isChecked = (bool)e.Value;
+        }
+
+        if (isChecked)
+        {
+            // Add genre to list if not already there
+            if (IsGenreSelected(genreId) == false)
+            {
+                selectedGenreIds.Add(genreId);
+            }
+        }
+        else
+        {
+            // Remove genre from list
+            for (int i = 0; i < selectedGenreIds.Count; i++)
+            {
+                if (selectedGenreIds[i] == genreId)
+                {
+                    selectedGenreIds.RemoveAt(i);
+                    break;
+                }
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    // Called when user selects an audio file
     private void OnFileSelected(InputFileChangeEventArgs e)
     {
         selectedFile = e.File;
         StateHasChanged();
     }
 
+    // Format file size in human-readable format (KB, MB, GB)
     private string FormatFileSize(long bytes)
     {
         string[] sizes = { "B", "KB", "MB", "GB" };
         double len = bytes;
         int order = 0;
+
+        // Keep dividing by 1024 until we get a reasonable number
         while (len >= 1024 && order < sizes.Length - 1)
         {
             order++;
             len = len / 1024;
         }
+
         return $"{len:0.##} {sizes[order]}";
     }
 
-    // Calculate audio duration using built-in .NET libraries
-    private async Task<int> CalculateAudioDuration(byte[] audioData)
-    {
-        try
-        {
-            if (audioData == null || audioData.Length < 128)
-                return 0;
-
-            // Create a temporary file to read duration using built-in libraries
-            string tempFilePath = Path.GetTempFileName();
-            try
-            {
-                await File.WriteAllBytesAsync(tempFilePath, audioData);
-                
-                // Use MediaFoundation (Windows) or try to read from file properties
-                int duration = GetDurationFromFile(tempFilePath);
-                
-                return duration;
-            }
-            finally
-            {
-                // Clean up temp file
-                if (File.Exists(tempFilePath))
-                    File.Delete(tempFilePath);
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error reading audio duration: {ex.Message}");
-            return EstimateDurationFromSize(audioData);
-        }
-    }
-
-    private int GetDurationFromFile(string filePath)
-    {
-        try
-        {
-            // Simple approach: try to read ID3v2 tag directly
-            using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
-            {
-                byte[] header = new byte[10];
-                fs.Read(header, 0, 10);
-                
-                // Check for ID3v2 tag
-                if (header[0] == 0x49 && header[1] == 0x44 && header[2] == 0x33)
-                {
-                    // Look for TLEN tag in first 1KB
-                    fs.Seek(0, SeekOrigin.Begin);
-                    byte[] buffer = new byte[1024];
-                    fs.Read(buffer, 0, 1024);
-                    
-                    string content = System.Text.Encoding.UTF8.GetString(buffer);
-                    
-                    // Look for TLEN tag
-                    int tlenIndex = content.IndexOf("TLEN");
-                    if (tlenIndex > 0)
-                    {
-                        // Extract duration value after TLEN
-                        int startIndex = tlenIndex + 4;
-                        string durationStr = "";
-                        
-                        for (int i = startIndex; i < buffer.Length && i < startIndex + 10; i++)
-                        {
-                            char c = (char)buffer[i];
-                            if (char.IsDigit(c))
-                                durationStr += c;
-                            else if (durationStr.Length > 0)
-                                break;
-                        }
-                        
-                        if (int.TryParse(durationStr, out int durationMs))
-                        {
-                            return durationMs / 1000; // Convert to seconds
-                        }
-                    }
-                }
-            }
-            
-            // Fallback to estimation
-            return EstimateDurationFromSize(File.ReadAllBytes(filePath));
-        }
-        catch
-        {
-            return 0;
-        }
-    }
-
-    private int EstimateDurationFromSize(byte[] audioData)
-    {
-        // Simple fallback estimation
-        if (audioData.Length < 1024) return 0;
-        
-        double estimatedBitrate = 128000; // 128 kbps
-        double estimatedDuration = (audioData.Length * 8.0) / estimatedBitrate;
-        
-        return (int)Math.Round(estimatedDuration);
-    }
-
+    // Main upload function - validates input and saves to database
     private async Task UploadSong()
     {
+        // VALIDATION STEP 1: Check if user is logged in
         if (user == null)
         {
             message = "You must be logged in to upload songs.";
@@ -226,6 +226,7 @@ else
             return;
         }
 
+        // VALIDATION STEP 2: Check if title is provided
         if (string.IsNullOrWhiteSpace(title))
         {
             message = "Please enter a song title.";
@@ -233,13 +234,15 @@ else
             return;
         }
 
-        if (selectedGenreId == 0)
+        // VALIDATION STEP 3: Check if at least one genre is selected
+        if (selectedGenreIds.Count == 0)
         {
-            message = "Please select a genre.";
+            message = "Please select at least one genre.";
             StateHasChanged();
             return;
         }
 
+        // VALIDATION STEP 4: Check if file is selected
         if (selectedFile == null)
         {
             message = "Please select an audio file.";
@@ -247,53 +250,60 @@ else
             return;
         }
 
-        // Validate file type
-        if (!selectedFile.ContentType.StartsWith("audio/"))
+        // VALIDATION STEP 5: Check file type (must be audio)
+        if (selectedFile.ContentType.StartsWith("audio/") == false)
         {
             message = "Please select a valid audio file.";
             StateHasChanged();
             return;
         }
 
-        // Validate file size (20MB max)
-        if (selectedFile.Size > 20 * 1024 * 1024)
+        // VALIDATION STEP 6: Check file size (maximum 20MB)
+        long maxFileSize = 20 * 1024 * 1024; // 20MB in bytes
+        if (selectedFile.Size > maxFileSize)
         {
             message = "File size must be less than 20MB.";
             StateHasChanged();
             return;
         }
 
+        // Show loading state
         isUploading = true;
         StateHasChanged();
 
         try
         {
-            // Log upload start
+            // Log upload details for debugging
             Console.WriteLine($"=== UPLOAD START ===");
             Console.WriteLine($"User ID: {user?.userid}");
             Console.WriteLine($"Title: '{title}'");
-            Console.WriteLine($"Genre ID: {selectedGenreId}");
+            Console.WriteLine($"Selected Genres: {string.Join(", ", selectedGenreIds)}");
             Console.WriteLine($"File: {selectedFile?.Name} ({selectedFile?.Size} bytes)");
             Console.WriteLine($"Content Type: {selectedFile?.ContentType}");
 
+            // STEP 1: Read the audio file into memory
+            // OpenReadStream allows us to read files up to 20MB
             using var stream = selectedFile.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
 
+            // Convert the file to a byte array for database storage
             byte[] audioData = ms.ToArray();
             Console.WriteLine($"Audio data size: {audioData.Length} bytes");
 
-            // Calculate audio duration
+            // STEP 2: Calculate the duration of the audio file
+            // We use TagLib library (in AudioHelper) to read MP3 metadata
             int duration = await SongManagment.AudioHelper.GetMp3DurationInSeconds(audioData);
             Console.WriteLine($"Calculated duration: {duration} seconds");
 
+            // STEP 3: Create a new Song object
+            // NOTE: We DO NOT set genreID anymore - that column was removed!
             Song song = new Song
             {
                 title = title.Trim(),
                 audioData = audioData,
                 userid = user.userid,
                 uploaded = DateTime.Now,
-                genreID = selectedGenreId,
                 duration = duration,
                 plays = 0
             };
@@ -301,21 +311,53 @@ else
             Console.WriteLine($"=== SAVING TO DATABASE ===");
             Console.WriteLine($"Song object created successfully");
 
+            // STEP 4: Insert the song into the database
             SongDB songDB = new SongDB();
             int rows = await songDB.AddSongAsync(song);
-            
+
             Console.WriteLine($"Database insert result: {rows} rows affected");
 
+            // Check if the insert was successful
             if (rows == 1)
             {
+                // STEP 5: Get the ID of the song we just inserted
+                // We need this to create the genre relationships
+                List<Song> allSongs = await songDB.SelectAllSongsAsync();
+
+                // Find the song we just added (it should be the last one)
+                int newSongId = 0;
+                for (int i = 0; i < allSongs.Count; i++)
+                {
+                    if (allSongs[i].title == song.title && allSongs[i].userid == user.userid)
+                    {
+                        newSongId = allSongs[i].songID;
+                    }
+                }
+
+                // STEP 6: Add genre relationships to song_genres table
+                if (newSongId > 0)
+                {
+                    SongGenreDB songGenreDB = new SongGenreDB();
+
+                    // Loop through all selected genres and create relationships
+                    for (int i = 0; i < selectedGenreIds.Count; i++)
+                    {
+                        int genreId = selectedGenreIds[i];
+                        await songGenreDB.AddSongGenreAsync(newSongId, genreId);
+                        Console.WriteLine($"Added genre {genreId} to song {newSongId}");
+                    }
+                }
+
                 message = "Song uploaded successfully!";
                 Console.WriteLine($"=== UPLOAD SUCCESS ===");
+
+                // Clear form
                 title = "";
                 selectedFile = null;
-                selectedGenreId = 0;
-                
-                // Navigate to songs page after successful upload
-                await Task.Delay(2000); // Show success message briefly
+                selectedGenreIds.Clear();
+
+                // Navigate to songs page after 2 seconds
+                await Task.Delay(2000);
                 Nav.NavigateTo("/songs");
             }
             else
@@ -326,21 +368,23 @@ else
         }
         catch (Exception ex)
         {
+            // If anything goes wrong, show error message
             message = $"Upload failed: {ex.Message}";
             Console.WriteLine($"=== UPLOAD FAILED ===");
             Console.WriteLine($"Exception: {ex.GetType().Name}");
             Console.WriteLine($"Message: {ex.Message}");
             Console.WriteLine($"Stack Trace: {ex.StackTrace}");
-            
+
             if (ex.InnerException != null)
             {
                 Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
             }
-            
+
             Console.WriteLine($"=== END OF ERROR ===");
         }
         finally
         {
+            // Always hide loading state when done
             isUploading = false;
             StateHasChanged();
         }

@@ -6,128 +6,202 @@
 @inject NavigationManager Nav
 @inject ProtectedSessionStorage Storage
 
-<h1>Songs</h1>
+<link href="css/songs.css" rel="stylesheet" />
 
-<!-- Search and Filter Section -->
-<div class="search-section">
-    <div class="search-controls">
-        <div class="search-input-group">
-            <input placeholder="Search songs by title..." @bind="searchText" @oninput="OnSearchInput" class="search-input" />
-            <button @onclick="Search" class="btn btn-search">Search</button>
-            <button @onclick="ClearSearch" class="btn btn-secondary">Clear</button>
+<div class="songs-page-wrapper">
+    <div class="songs-main-section">
+        <div class="page-header">
+            <h1>Songs</h1>
         </div>
-        
-        <div class="results-info">
-            @if (!string.IsNullOrEmpty(searchText))
-            {
-                <span>Found @songList.Count songs matching "@searchText"</span>
-            }
-            else
-            {
-                <span>All Songs (@songList.Count)</span>
-            }
+
+        <!-- Search Section -->
+        <div class="search-section">
+            <input placeholder="Search songs..." @bind="searchText" @oninput="OnSearchInput" />
+            <button @onclick="Search">Search</button>
+            <button @onclick="ClearSearch">Clear</button>
         </div>
-    </div>
-</div>
 
-<hr />
+        <hr class="divider" />
 
-<!-- Songs List -->
-@if (songList == null)
-{
-    <div class="loading">
-        <p>Loading songs...</p>
-    </div>
-}
-else if (songList.Count == 0)
-{
-    <div class="no-results">
-        <p>No songs found.</p>
-        @if (!string.IsNullOrEmpty(searchText))
+        @if (songList == null)
         {
-            <button @onclick="ClearSearch" class="btn btn-secondary">Show All Songs</button>
+            <p class="loading-message">Loading songs...</p>
         }
-    </div>
-}
-else
-{
-    <div class="songs-grid">
-        @foreach (Song song in songList)
+        else if (songList.Count == 0)
         {
-            <div class="song-card">
-                <div class="song-header">
-                    <h4>@song.title</h4>
-                    <div class="song-meta">
-                        <span class="duration">Duration: @FormatDuration(song.duration)</span>
-                        <span class="plays">Plays: @song.plays</span>
-                    </div>
-                </div>
-                
-                @{
-                    var audioSource = song.GetAudioSource(song.audioData);
-                }
-                @if (!string.IsNullOrEmpty(audioSource))
+            <p class="no-songs-message">No songs found.</p>
+        }
+        else
+        {
+            @for (int i = 0; i < songList.Count; i++)
+            {
+                Song song = songList[i];
+
+                // Calculate average rating manually
+                double total = 0;
+                int count = 0;
+
+                for (int j = 0; j < allRatings.Count; j++)
                 {
-                    <div class="audio-container">
-                        <audio controls preload="none" style="width: 100%;">
-                            <source src="@audioSource" />
-                            Your browser does not support the audio element.
-                        </audio>
-                        <div class="audio-debug">
-                            <small>Audio data size: @(song.audioData?.Length ?? 0) bytes</small>
-                        </div>
-                    </div>
-                }
-                else
-                {
-                    <p class="no-audio">No audio data available</p>
+                    if (allRatings[j].songid == song.songID)
+                    {
+                        total += allRatings[j].rating;
+                        count++;
+                    }
                 }
 
-                <div class="song-actions">
-                    <div class="star-rating">
-                        @for (int i = 1; i <= 5; i++)
+                double avgRating = 0;
+                if (count > 0)
+                {
+                    avgRating = total / count;
+                }
+
+                <div class="song-card">
+                    <h3>@song.title</h3>
+                    <p class="song-info">Duration: @FormatDuration(song.duration) | Plays: @song.plays | Avg: @avgRating.ToString("0.0") (@count ratings)</p>
+
+                    @if (song.audioData != null)
+                    {
+                        <div class="custom-audio-player">
+                            <audio id="audio-@song.songID"
+                                   controls
+                                   preload="metadata"
+                                   @onended="() => OnSongEnded(song.songID)"
+                                   @onplay="() => OnSongStarted(song.songID)">
+                                <source src="@song.GetAudioSource(song.audioData)" />
+                                Your browser does not support audio.
+                            </audio>
+                        </div>
+
+                        <div class="action-buttons">
+                            <button class="add-to-queue-btn" @onclick="() => AddToQueue(song)">
+                                Add to Queue
+                            </button>
+                        </div>
+                    }
+
+                    <!-- Star rating -->
+                    <div class="stars-section">
+                        <div class="stars">
+                            @if (currentUser == null)
+                            {
+                                @for (int s = 1; s <= 5; s++)
+                                {
+                                    int currentStar = s;
+                                    string starClass = GetStarClassForDisplay(song.songID, currentStar);
+
+                                    <span class="star @starClass disabled">
+                                        ★
+                                    </span>
+                                }
+                            }
+                            else
+                            {
+                                @for (int s = 1; s <= 5; s++)
+                                {
+                                    int currentStar = s;
+                                    string starClass = GetStarClass(song.songID, currentStar);
+
+                                    <span class="star @starClass"
+                                          @onmouseover="() => OnHover(song.songID, currentStar)"
+                                          @onmouseout="() => OnHover(song.songID, 0)"
+                                          @onclick="() => OnClick(song.songID, currentStar)">
+                                        ★
+                                    </span>
+                                }
+                            }
+                        </div>
+
+                        @if (currentUser == null)
                         {
-                            <span class="star @(IsStarFilled(song.songID, i) ? "filled" : "")"
-                                  @onmouseover="() => OnHover(song.songID, i)"
-                                  @onmouseout="() => OnHover(song.songID, 0)"
-                                  @onclick="() => OnClick(song.songID, i)">
-                                ★
-                            </span>
+                            <div class="login-notice">
+                                Please <a @onclick="GoToLogin">log in</a> to rate songs
+                            </div>
                         }
                     </div>
                 </div>
-            </div>
+            }
         }
     </div>
-}
+
+    <!-- Queue Sidebar -->
+    <div class="queue-sidebar">
+        <h3>Play Queue</h3>
+
+        <div class="queue-list">
+            @if (playQueue.Count == 0)
+            {
+                <div class="no-queue">
+                    No songs in queue. Add songs to start playing!
+                </div>
+            }
+            else
+            {
+                @for (int i = 0; i < playQueue.Count; i++)
+                {
+                    Song queueSong = playQueue[i];
+                    string queueClass = "";
+                    if (currentlyPlayingSongId == queueSong.songID)
+                    {
+                        queueClass = "playing";
+                    }
+
+                    <div class="queue-item @queueClass" @onclick="() => PlayFromQueue(i)">
+                        <div class="queue-item-title">@queueSong.title</div>
+                        <div class="queue-item-duration">@FormatDuration(queueSong.duration)</div>
+                    </div>
+                }
+            }
+        </div>
+
+        @if (playQueue.Count > 0)
+        {
+            <button class="clear-queue-btn" @onclick="ClearQueue">Clear Queue</button>
+        }
+    </div>
+</div>
 
 @code
 {
-    // List of songs shown on the page
+    // List of all songs displayed on the page
     private List<Song> songList = new List<Song>();
 
-    // Text the user types into the search box
+    // List of ALL ratings from database (for calculating averages)
+    private List<Rating> allRatings = new List<Rating>();
+
+    // Search text entered by user
     private string searchText = "";
-    
-    // User information for ratings
+
+    // Currently logged-in user (null if not logged in)
     private User? currentUser;
 
+    // Play queue management
+    private List<Song> playQueue = new List<Song>();
+    private int currentlyPlayingSongId = -1;
+
+    // User's personal ratings (songId -> rating value 1-5)
+    private Dictionary<int, int> userRatings = new Dictionary<int, int>();
+
+    // Temporary ratings shown when hovering over stars (songId -> star number)
+    private Dictionary<int, int> previewRatings = new Dictionary<int, int>();
+
+    // Called after component renders for the first time
     protected override async Task OnAfterRenderAsync(bool first)
     {
-        if(first)
+        if (first)
         {
             await LoadCurrentUser();
             await LoadAllSongs();
         }
     }
 
+    // Load current user from session storage
     private async Task LoadCurrentUser()
     {
         var result = await Storage.GetAsync<User>("user");
         if (result.Success)
         {
             currentUser = result.Value;
-            await LoadUserRatings();
         }
         else
         {
@@ -135,22 +209,56 @@ else
         }
     }
 
-    // Load all songs when the page opens
+    // Load all songs from database along with all their ratings
     private async Task LoadAllSongs()
     {
-        try
+        SongDB db = new SongDB();
+        songList = await db.SelectAllSongsAsync();
+
+        RatingDB ratingDB = new RatingDB();
+        allRatings.Clear();
+
+        // Load all ratings for all songs
+        // This is for calculating average ratings displayed to everyone
+        for (int i = 0; i < songList.Count; i++)
         {
-            SongDB db = new SongDB();
-            songList = await db.SelectAllSongsAsync();
+            List<Rating> songRatings = await ratingDB.GetSongRatingsAsync(songList[i].songID);
+            for (int j = 0; j < songRatings.Count; j++)
+            {
+                allRatings.Add(songRatings[j]);
+            }
+        }
+
+        // If user is logged in, also load their personal ratings
+        if (currentUser != null)
+        {
             await LoadUserRatings();
         }
-        catch (Exception ex)
+
+        StateHasChanged();
+    }
+
+    // Load the logged-in user's personal ratings
+    // These are stored in userRatings dictionary for quick lookup
+    private async Task LoadUserRatings()
+    {
+        if (currentUser == null)
         {
-            Console.WriteLine($"Error loading songs: {ex.Message}");
+            return;
+        }
+
+        RatingDB ratingDB = new RatingDB();
+        List<Rating> ratings = await ratingDB.GetUserRatingsAsync(currentUser.userid);
+
+        userRatings.Clear();
+        for (int i = 0; i < ratings.Count; i++)
+        {
+            userRatings[ratings[i].songid] = ratings[i].rating;
         }
     }
 
-    // Real-time search as user types
+    // Called when user types in the search box
+    // If they clear the search box, reload all songs
     private async Task OnSearchInput(ChangeEventArgs e)
     {
         searchText = e.Value?.ToString() ?? "";
@@ -160,78 +268,155 @@ else
         }
     }
 
-    // Search for songs by title
+    // Search for songs based on search text
+    // FIXED: No longer reloads all songs after searching!
     private async Task Search()
     {
-        try
+        SongDB db = new SongDB();
+        songList = await db.SearchSongsAsync(searchText.Trim());
+
+        // Reload ratings for the search results
+        RatingDB ratingDB = new RatingDB();
+        allRatings.Clear();
+
+        for (int i = 0; i < songList.Count; i++)
         {
-            SongDB db = new SongDB();
-            songList = await db.SearchSongsAsync(searchText.Trim());
-            await LoadUserRatings();
+            List<Rating> songRatings = await ratingDB.GetSongRatingsAsync(songList[i].songID);
+            for (int j = 0; j < songRatings.Count; j++)
+            {
+                allRatings.Add(songRatings[j]);
+            }
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error searching songs: {ex.Message}");
-        }
+
+        StateHasChanged();
     }
 
-    // Clear search and show all songs
+    // Clear search and show all songs again
     private async Task ClearSearch()
     {
         searchText = "";
         await LoadAllSongs();
     }
 
-    void GoUpload()
-    {
-        Nav.NavigateTo("/upload");
-    }
-
-    async Task Logout()
-    {
-        await Storage.DeleteAsync("user");
-        Nav.NavigateTo("/login");
-    }
-
-    // Convert seconds to "m:ss" format (easy to read)
-    string FormatDuration(int seconds)
+    // Convert duration in seconds to "minutes:seconds" format
+    // Example: 125 seconds becomes "2:05"
+    private string FormatDuration(int seconds)
     {
         int minutes = seconds / 60;
         int secs = seconds % 60;
         return minutes.ToString() + ":" + secs.ToString("00");
     }
 
-    // RATING SYSTEM
+    // ===== QUEUE MANAGEMENT =====
 
-    // stores the rating the user has clicked (songId -> value)
-    private Dictionary<int, int> userRatings = new Dictionary<int, int>();
-
-    // stores the temporary hover preview (songId -> value)
-    private Dictionary<int, int> previewRatings = new Dictionary<int, int>();
-
-    // Load user's existing ratings from database
-    private async Task LoadUserRatings()
+    // Add a song to the play queue
+    private void AddToQueue(Song song)
     {
-        if (currentUser == null) return;
-
-        try
+        // Check if song is already in queue
+        bool alreadyInQueue = false;
+        for (int i = 0; i < playQueue.Count; i++)
         {
-            RatingDB ratingDB = new RatingDB();
-            var ratings = await ratingDB.GetUserRatingsAsync(currentUser.userid);
-            
-            userRatings.Clear();
-            foreach (var rating in ratings)
+            if (playQueue[i].songID == song.songID)
             {
-                userRatings[rating.songid] = rating.rating;
+                alreadyInQueue = true;
+                break;
             }
         }
-        catch (Exception ex)
+
+        // Only add if not already there
+        if (alreadyInQueue == false)
         {
-            Console.WriteLine($"Error loading user ratings: {ex.Message}");
+            playQueue.Add(song);
+            StateHasChanged();
         }
     }
 
-    // Called when the mouse moves over or out of a star.
+    // Play a specific song from the queue
+    private void PlayFromQueue(int index)
+    {
+        if (index < 0)
+        {
+            return;
+        }
+        if (index >= playQueue.Count)
+        {
+            return;
+        }
+
+        Song songToPlay = playQueue[index];
+        currentlyPlayingSongId = songToPlay.songID;
+        StateHasChanged();
+
+        // NOTE: Actual audio playback control would require JavaScript interop
+        // This just tracks which song should be playing
+    }
+
+    // Called when a song starts playing
+    // Increments the play count in database
+    private void OnSongStarted(int songId)
+    {
+        currentlyPlayingSongId = songId;
+
+        // Increment play count in background
+        Task.Run(async () =>
+        {
+            SongDB db = new SongDB();
+            await db.AddPlayAsync(songId);
+        });
+
+        StateHasChanged();
+    }
+
+    // Called when a song finishes playing
+    // Automatically plays the next song in queue if available
+    private void OnSongEnded(int songId)
+    {
+        // Find current song in queue
+        int currentIndex = -1;
+        for (int i = 0; i < playQueue.Count; i++)
+        {
+            if (playQueue[i].songID == songId)
+            {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        // Play next song if it exists
+        if (currentIndex >= 0)
+        {
+            int nextIndex = currentIndex + 1;
+            if (nextIndex < playQueue.Count)
+            {
+                PlayFromQueue(nextIndex);
+            }
+            else
+            {
+                currentlyPlayingSongId = -1;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    // Clear all songs from the queue
+    private void ClearQueue()
+    {
+        playQueue.Clear();
+        currentlyPlayingSongId = -1;
+        StateHasChanged();
+    }
+
+    // Navigate to login page
+    private void GoToLogin()
+    {
+        Nav.NavigateTo("/login");
+    }
+
+    // ===== STAR RATING SYSTEM =====
+
+    // Called when mouse hovers over a star
+    // Shows preview of what rating would look like
     void OnHover(int songId, int value)
     {
         if (value > 0)
@@ -245,38 +430,113 @@ else
         StateHasChanged();
     }
 
-    // Called when the user clicks a star to pick a rating.
+    // Called when user clicks a star to rate a song
+    // Saves the rating to the database
     private async Task OnClick(int songId, int value)
     {
         if (currentUser == null)
         {
-            // You could show a message here asking user to login
             return;
         }
 
-        try
+        RatingDB ratingDB = new RatingDB();
+        await ratingDB.SaveRatingAsync(currentUser.userid, songId, value);
+
+        // Update local rating dictionary
+        userRatings[songId] = value;
+
+        // Also update allRatings list for average calculation
+        bool exists = false;
+        for (int i = 0; i < allRatings.Count; i++)
         {
-            RatingDB ratingDB = new RatingDB();
-            await ratingDB.SaveRatingAsync(currentUser.userid, songId, value);
-            
-            userRatings[songId] = value;
-            StateHasChanged();
+            if (allRatings[i].songid == songId && allRatings[i].userid == currentUser.userid)
+            {
+                allRatings[i].rating = value;
+                exists = true;
+            }
         }
-        catch (Exception ex)
+        if (exists == false)
         {
-            Console.WriteLine($"Error saving rating: {ex.Message}");
+            allRatings.Add(new Rating
+            {
+                songid = songId,
+                userid = currentUser.userid,
+                rating = value,
+                daterated = System.DateTime.Now
+            });
         }
+
+        StateHasChanged();
     }
 
-    // Decide if a star should look filled:
-    bool IsStarFilled(int songId, int starIndex)
+    // Determine which CSS class to apply to stars for LOGGED-IN users
+    // Shows their personal rating with hover preview
+    string GetStarClass(int songId, int starIndex)
     {
-        if (previewRatings.ContainsKey(songId) && previewRatings[songId] > 0)
-            return starIndex <= previewRatings[songId];
+        // First check if we are hovering
+        if (previewRatings.ContainsKey(songId))
+        {
+            int hoverValue = previewRatings[songId];
+            if (starIndex <= hoverValue)
+            {
+                return "filled";
+            }
+            else
+            {
+                return "gray";
+            }
+        }
 
+        // If not hovering, check the user's actual rating
         if (userRatings.ContainsKey(songId))
-            return starIndex <= userRatings[songId];
+        {
+            int userValue = userRatings[songId];
+            if (starIndex <= userValue)
+            {
+                return "filled";
+            }
+            else
+            {
+                return "gray";
+            }
+        }
 
-        return false;
+        // No rating at all, show all gray
+        return "gray";
+    }
+
+    // Determine which CSS class to apply to stars for NON-LOGGED users
+    // Shows the average rating from all users (read-only)
+    string GetStarClassForDisplay(int songId, int starIndex)
+    {
+        // Calculate average rating for this song
+        double total = 0;
+        int count = 0;
+
+        for (int i = 0; i < allRatings.Count; i++)
+        {
+            if (allRatings[i].songid == songId)
+            {
+                total += allRatings[i].rating;
+                count++;
+            }
+        }
+
+        if (count > 0)
+        {
+            double avgRating = total / count;
+            int roundedAvg = (int)Math.Round(avgRating);
+
+            if (starIndex <= roundedAvg)
+            {
+                return "filled";
+            }
+            else
+            {
+                return "gray";
+            }
+        }
+
+        return "gray";
     }
 }

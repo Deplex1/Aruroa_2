@@ -1,6 +1,7 @@
-﻿using Models;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Models;
 
 namespace DBL
 {
@@ -58,13 +59,11 @@ namespace DBL
             }
         }
 
-        // Save rating (alias for AddOrUpdateRatingAsync)
         public async Task SaveRatingAsync(int userId, int songId, int value)
         {
             await AddOrUpdateRatingAsync(userId, songId, value);
         }
 
-        // Get all ratings for a specific user
         public async Task<List<Rating>> GetUserRatingsAsync(int userId)
         {
             string sql = "SELECT * FROM ratings WHERE userid=@u ORDER BY daterated DESC";
@@ -74,7 +73,6 @@ namespace DBL
             return await SelectAllAsync(sql, p);
         }
 
-        // Get all ratings for a specific song
         public async Task<List<Rating>> GetSongRatingsAsync(int songId)
         {
             string sql = "SELECT * FROM ratings WHERE songid=@s ORDER BY daterated DESC";
@@ -84,7 +82,6 @@ namespace DBL
             return await SelectAllAsync(sql, p);
         }
 
-        // Get user's rating for a specific song
         public async Task<Rating?> GetUserRatingForSongAsync(int userId, int songId)
         {
             string sql = "SELECT * FROM ratings WHERE userid=@u AND songid=@s";
@@ -95,30 +92,5 @@ namespace DBL
             var list = await SelectAllAsync(sql, p);
             return list.Count > 0 ? list[0] : null;
         }
-
-        //public async Task<double> GetAverageRatingAsync(int songId)
-        //{
-        //    string sql = "SELECT AVG(rating) FROM ratings WHERE songid=@s";
-        //    var p = new Dictionary<string, object> { 
-        //        { "s", songId } 
-        //    };
-
-        //    List<object> list = await SelectAllAsync(sql, p);
-
-        //    if (list != null && list.Count > 0)
-        //    {
-        //        object[] row = (object[])list[0];
-        //        object val = row[0];
-
-        //        // Check for both C# null and Database Null
-        //        if (val != null && val != DBNull.Value)
-        //        {
-        //            // Direct conversion is safer and faster
-        //            return Convert.ToDouble(val);
-        //        }
-        //    }
-
-        //    return 0;
-        //}
     }
 }
