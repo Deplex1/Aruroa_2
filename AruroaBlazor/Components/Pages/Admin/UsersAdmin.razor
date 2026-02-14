@@ -1,0 +1,222 @@
+﻿@page "/adminDashboard/manageUsers"
+
+@using Models
+@using DBL
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject ProtectedSessionStorage Storage
+@inject NavigationManager Nav
+
+@if (user == null)
+{
+    <p>You must be logged in as an admin to view this page.</p>
+}
+else if (user.IsAdmin == 0)
+{
+    <p>You do not have permission to view this page.</p>
+}
+else
+{
+    <div class="admin-page">
+        <h2>Users Administration</h2>
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="message">
+                @message
+            </div>
+        }
+
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Is Admin</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (int i = 0; i < users.Count; i++)
+                {
+                    <tr>
+                        <td>@users[i].userid</td>
+                        <td>@users[i].username</td>
+                        <td>@users[i].email</td>
+                        <td>
+                            @if (users[i].IsAdmin == 1)
+                            {
+                                @:Yes
+                            }
+                            else
+                            {
+                                @:No
+                            }
+                        </td>
+                        <td>
+                            <button @onclick="ToggleAdminClicked">Toggle Admin</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private User user = null;
+    private List<User> users = new List<User>();
+    private string message = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var result = await Storage.GetAsync<User>("user");
+        if (result.Success)
+        {
+            user = result.Value;
+            if (user.IsAdmin == 1)
+            {
+                await LoadUsers();
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            UserDB uDB = new UserDB();
+            users = await uDB.GetAllUsersAsync(); // Use the wrapper you already have
+        }
+        catch (Exception ex)
+        {
+            message = "Error loading users: " + ex.Message;
+        }
+    }
+
+    private async Task DeleteUserByIndex(int index)
+    {
+        if (index < 0 || index >= users.Count) return;
+
+        User u = users[index];
+
+        if (u.userid == user.userid)
+        {
+            message = "You cannot delete yourself!";
+            return;
+        }
+
+        bool confirmed = await ConfirmAsync("Are you sure you want to delete this user?");
+        if (!confirmed) return;
+
+        try
+        {
+            UserDB uDB = new UserDB();
+            await uDB.DeleteUserAsync(u.userid); // Call the existing wrapper
+            message = "User deleted successfully.";
+            await LoadUsers();
+        }
+        catch (Exception ex)
+        {
+            message = "Error deleting user: " + ex.Message;
+        }
+    }
+
+    private async Task ToggleAdminByIndex(int index)
+    {
+        if (index < 0 || index >= users.Count) return;
+
+        User u = users[index];
+
+        if (u.userid == user.userid)
+        {
+            message = "You cannot change your own admin status!";
+            return;
+        }
+
+        try
+        {
+            UserDB uDB = new UserDB();
+            Dictionary<string, object> fields = new Dictionary<string, object>();
+
+            if (u.IsAdmin == 1)
+            {
+                fields.Add("IsAdmin", 0);
+                users[index].IsAdmin = 0;
+            }
+            else
+            {
+                fields.Add("IsAdmin", 1);
+                users[index].IsAdmin = 1;
+            }
+
+            await uDB.UpdateUserAsync(u.userid, fields);
+
+            message = "User admin status updated.";
+        }
+        catch (Exception ex)
+        {
+            message = "Error updating user: " + ex.Message;
+        }
+    }
+
+
+    private async Task ToggleAdminByIndex(int index)
+    {
+        // Check if index is valid
+        if (index < 0 || index >= users.Count)
+        {
+            message = "Invalid user selection!";
+            return;
+        }
+
+        // Get the user from the list
+        User selectedUser = users[index];
+
+        // Prevent changing your own admin status
+        if (selectedUser.userid == user.userid)
+        {
+            message = "You cannot change your own admin status!";
+            return;
+        }
+
+        try
+        {
+            // Create a dictionary to hold the fields we want to update
+            Dictionary<string, object> fieldsToUpdate = new Dictionary<string, object>();
+
+            // Toggle admin: if 1 set to 0, else set to 1
+            if (selectedUser.IsAdmin == 1)
+            {
+                fieldsToUpdate.Add("IsAdmin", 0);
+            }
+            else
+            {
+                fieldsToUpdate.Add("IsAdmin", 1);
+            }
+
+            // Call UserDB wrapper to update the user
+            UserDB uDB = new UserDB();
+            await uDB.UpdateUserAsync(selectedUser.userid, fieldsToUpdate);
+
+            // Reload users list after update
+            await LoadUsers();
+
+            message = "User admin status updated successfully.";
+        }
+        catch (Exception ex)
+        {
+            message = "Error updating user: " + ex.Message;
+        }
+    }
+
+
+    private async Task<bool> ConfirmAsync(string text)
+    {
+        // Placeholder, always returns true for simplicity
+        return true;
+    }
+}

@@ -125,5 +125,23 @@ namespace DBL
             // Call the BaseDB.UpdateAsync method
             return await UpdateAsync(fieldsToUpdate, where);
         }
+
+        // ------------------- WRAPPERS -------------------
+
+        public async Task<List<User>> GetAllUsersAsync()
+        {
+            // Calls the protected SelectAllAsync() from BaseDB
+            return await SelectAllAsync();
+        }
+
+        public async Task<int> DeleteUserAsync(int userId)
+        {
+            // Prepare the filter
+            Dictionary<string, object> filter = new Dictionary<string, object>();
+            filter.Add("userid", userId);
+
+            // Calls the protected DeleteAsync() from BaseDB
+            return await DeleteAsync(filter);
+        }
     }
 }

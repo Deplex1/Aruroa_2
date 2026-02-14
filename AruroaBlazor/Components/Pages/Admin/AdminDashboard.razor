@@ -1,0 +1,71 @@
+﻿@page "/adminDashboard"
+
+@using Models
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject ProtectedSessionStorage Storage
+@inject NavigationManager Nav
+
+<h1>Admin Dashboard</h1>
+
+@if (user == null)
+{
+    <p>You must be logged in to view this page.</p>
+}
+else if (user.IsAdmin == 0)
+{
+    <p>You are not an admin.</p>
+}
+else
+{
+    <p>Welcome, @user.username. Here you can access all admin tools.</p>
+
+    <div class="admin-links" style="display:flex; flex-wrap:wrap; gap:20px; margin-top:20px;">
+        <button style="padding:10px 20px; font-size:16px;" @onclick="GoToManageGenres">Manage Genres</button>
+        <button style="padding:10px 20px; font-size:16px;" @onclick="GoToManageUsers">Manage Users</button>
+        <button style="padding:10px 20px; font-size:16px;" @onclick="GoToManagePlaylists">Manage Playlists</button>
+        <button style="padding:10px 20px; font-size:16px;" @onclick="GoToManageSongs">Manage Songs</button>
+    </div>
+}
+
+@code {
+    private User user = null;
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (!first) return;
+
+        var result = await Storage.GetAsync<User>("user");
+
+        if (result.Success)
+        {
+            user = result.Value;
+        }
+        else
+        {
+            user = null;
+        }
+
+        StateHasChanged();
+    }
+
+    
+    private void GoToManageGenres()
+    {
+        Nav.NavigateTo("/adminDashboard/manageGenres");
+    }
+
+    private void GoToManageUsers()
+    {
+        Nav.NavigateTo("/adminDashboard/manageUsers");
+    }
+
+    private void GoToManagePlaylists()
+    {
+        Nav.NavigateTo("/adminDashboard/managePlaylists");
+    }
+
+    private void GoToManageSongs()
+    {
+        Nav.NavigateTo("/adminDashboard/manageSongs");
+    }
+}
