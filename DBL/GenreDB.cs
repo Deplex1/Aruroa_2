@@ -38,5 +38,14 @@ namespace DBL
 
             return rows;
         }
+
+
+        public async Task<int> DeleteGenreAsync(int genreId)
+        {
+            Dictionary<string, object> filter = new Dictionary<string, object>();
+            filter.Add("genreid", genreId);
+
+            return await DeleteAsync(filter);
+        }
     }
 }
