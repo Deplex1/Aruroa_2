@@ -74,7 +74,18 @@ else
                         </div>
 
                         <div class="playlist-info">
-                            <p>Songs:@GetSongCountAsync(playlist.playlistid)</p>
+                            <p>
+                                Songs:
+                                @{
+                                    int count = 0;
+
+                                    if (playlistSongCounts.ContainsKey(playlist.playlistid))
+                                    {
+                                        count = playlistSongCounts[playlist.playlistid];
+                                    }
+                                }
+                                @count
+                            </p>
                         </div>
 
                         <div class="playlist-actions">
@@ -195,6 +206,8 @@ else
 
     // All songs available in the database (for adding to playlists)
     private List<Song> allSongs = new List<Song>();
+    // Holds song count for each playlist (playlistId -> count)
+private Dictionary<int, int> playlistSongCounts = new Dictionary<int, int>();
 
     // Form inputs
     private string newPlaylistName = "";
@@ -219,6 +232,7 @@ else
             {
                 user = result.Value;
                 await LoadUserPlaylists();
+                await LoadSongCountsAsync(); 
                 await LoadAllSongs();
             }
             else
@@ -531,6 +545,32 @@ else
             StateHasChanged();
         }
     }
+
+    // Load song counts for all playlists at once
+    private async Task LoadSongCountsAsync()
+    {
+        playlistSongCounts.Clear();
+
+        try
+        {
+            PlaylistSongDB playlistSongDB = new PlaylistSongDB();
+
+            for (int i = 0; i < userPlaylists.Count; i++)
+            {
+                int playlistId = userPlaylists[i].playlistid;
+
+                int count = await playlistSongDB.GetSongCountAsync(playlistId);
+
+                // Store the result so the UI can use it instantly
+                playlistSongCounts[playlistId] = count;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error loading song counts: " + ex.Message);
+        }
+    }
+
 
     // Navigate to songs page
     private void GoToSongs()
