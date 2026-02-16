@@ -1,7 +1,7 @@
 ﻿@page "/playlists"
 @using Models
-@using DBL
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using Services
 @inject ProtectedSessionStorage Storage
 @inject NavigationManager Nav
 
@@ -126,7 +126,7 @@ else
                         <div class="song-item">
                             <div class="song-info">
                                 <h4>@song.title</h4>
-                                <p>Duration: @FormatDuration(song.duration)</p>
+                                <p>Duration: @uiHelper.FormatDuration(song.duration)</p>
                             </div>
 
                             @{
@@ -163,15 +163,7 @@ else
                                 Song availableSong = allSongs[i];
 
                                 // Check if this song is already in the playlist
-                                bool alreadyInPlaylist = false;
-                                for (int j = 0; j < playlistSongs.Count; j++)
-                                {
-                                    if (playlistSongs[j].songID == availableSong.songID)
-                                    {
-                                        alreadyInPlaylist = true;
-                                        break;
-                                    }
-                                }
+                                bool alreadyInPlaylist = playlistService.IsSongInPlaylist(availableSong.songID, playlistSongs);
 
                                 // Only show songs that aren't in the playlist yet
                                 if (alreadyInPlaylist == false)
@@ -191,40 +183,32 @@ else
 }
 
 @code {
-    // Currently logged-in user
+    // Service instances
+    private PlaylistService playlistService = new PlaylistService();
+    private UIHelperService uiHelper = new UIHelperService();
+
+    // UI state variables
     private User? user;
     private bool isLoading = true;
-
-    // List of playlists belonging to the user
     private List<Playlist> userPlaylists = new List<Playlist>();
-
-    // The playlist currently being viewed (null if none selected)
     private Playlist? selectedPlaylist;
-
-    // Songs in the currently selected playlist
     private List<Song> playlistSongs = new List<Song>();
-
-    // All songs available in the database (for adding to playlists)
     private List<Song> allSongs = new List<Song>();
-    // Holds song count for each playlist (playlistId -> count)
-private Dictionary<int, int> playlistSongCounts = new Dictionary<int, int>();
-
-    // Form inputs
+    private Dictionary<int, int> playlistSongCounts = new Dictionary<int, int>();
     private string newPlaylistName = "";
     private bool isPublic = true;
     private string message = "";
     private int selectedSongId = 0;
     private bool isAddingSong = false;
-
     private bool hasLoaded = false;
 
+    // Lifecycle method - loads data on first render
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (hasLoaded == false || firstRender)
         {
             hasLoaded = true;
             isLoading = true;
-            // DON'T call StateHasChanged here!
 
             var result = await Storage.GetAsync<User>("user");
 
@@ -232,7 +216,7 @@ private Dictionary<int, int> playlistSongCounts = new Dictionary<int, int>();
             {
                 user = result.Value;
                 await LoadUserPlaylists();
-                await LoadSongCountsAsync(); 
+                await LoadSongCountsAsync();
                 await LoadAllSongs();
             }
             else
@@ -243,13 +227,11 @@ private Dictionary<int, int> playlistSongCounts = new Dictionary<int, int>();
             }
 
             isLoading = false;
-            StateHasChanged();  // ← Only call it HERE at the end!
+            StateHasChanged();
         }
     }
 
-    
-
-    // Load all playlists created by the logged-in user
+    // Load all playlists created by the logged-in user using service
     private async Task LoadUserPlaylists()
     {
         if (user == null)
@@ -257,32 +239,16 @@ private Dictionary<int, int> playlistSongCounts = new Dictionary<int, int>();
             return;
         }
 
-        try
-        {
-            PlaylistDB playlistDB = new PlaylistDB();
-            userPlaylists = await playlistDB.GetUserPlaylistsAsync(user.userid);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading playlists: {ex.Message}");
-        }
+        userPlaylists = await playlistService.LoadUserPlaylistsAsync(user.userid);
     }
 
-    // Load all songs from database (needed for adding songs to playlists)
+    // Load all songs from database using service
     private async Task LoadAllSongs()
     {
-        try
-        {
-            SongDB songDB = new SongDB();
-            allSongs = await songDB.SelectAllSongsAsync();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading songs: {ex.Message}");
-        }
+        allSongs = await playlistService.LoadAllSongsAsync();
     }
 
-    // Create a new playlist
+    // Create a new playlist using service
     private async Task CreatePlaylist()
     {
         if (user == null)
@@ -294,98 +260,43 @@ private Dictionary<int, int> playlistSongCounts = new Dictionary<int, int>();
             return;
         }
 
-        try
+        int result = await playlistService.CreatePlaylistAsync(user.userid, newPlaylistName, isPublic);
+
+        if (result > 0)
         {
-            PlaylistDB playlistDB = new PlaylistDB();
-            Playlist newPlaylist = new Playlist
-            {
-                name = newPlaylistName.Trim(),
-                userid = user.userid,
-                ispublic = isPublic
-            };
-
-            int result = await playlistDB.AddPlaylistAsync(newPlaylist);
-
-            if (result > 0)
-            {
-                message = "Playlist created successfully!";
-                newPlaylistName = "";
-                isPublic = true;
-                await LoadUserPlaylists();
-                StateHasChanged();
-            }
-            else
-            {
-                message = "Error creating playlist. Please try again.";
-            }
-        }
-        catch (Exception ex)
-        {
-            message = $"Error creating playlist: {ex.Message}";
-        }
-    }
-
-    // View a specific playlist and load its songs
-    private async Task ViewPlaylist(int playlistId)
-    {
-        try
-        {
-            // Find the playlist in the user's playlist list
-            selectedPlaylist = null;
-            for (int i = 0; i < userPlaylists.Count; i++)
-            {
-                if (userPlaylists[i].playlistid == playlistId)
-                {
-                    selectedPlaylist = userPlaylists[i];
-                    break;
-                }
-            }
-
-            if (selectedPlaylist != null)
-            {
-                await LoadPlaylistSongs(playlistId);
-            }
+            message = "Playlist created successfully!";
+            newPlaylistName = "";
+            isPublic = true;
+            await LoadUserPlaylists();
+            await LoadSongCountsAsync();
             StateHasChanged();
         }
-        catch (Exception ex)
+        else
         {
-            Console.WriteLine($"Error viewing playlist: {ex.Message}");
+            message = "Error creating playlist. Please try again.";
         }
     }
 
-    // Load all songs that are in a specific playlist
+    // View a specific playlist and load its songs using service
+    private async Task ViewPlaylist(int playlistId)
+    {
+        // Find the playlist using service
+        selectedPlaylist = playlistService.FindPlaylistById(playlistId, userPlaylists);
+
+        if (selectedPlaylist != null)
+        {
+            await LoadPlaylistSongs(playlistId);
+        }
+        StateHasChanged();
+    }
+
+    // Load all songs that are in a specific playlist using service
     private async Task LoadPlaylistSongs(int playlistId)
     {
-        try
-        {
-            PlaylistSongDB playlistSongDB = new PlaylistSongDB();
-            var playlistSongRelations = await playlistSongDB.GetSongsInPlaylistAsync(playlistId);
-
-            playlistSongs.Clear();
-
-            // For each song ID in the playlist, find the full song object
-            for (int i = 0; i < playlistSongRelations.Count; i++)
-            {
-                int songId = playlistSongRelations[i].songid;
-
-                // Find the song in allSongs list
-                for (int j = 0; j < allSongs.Count; j++)
-                {
-                    if (allSongs[j].songID == songId)
-                    {
-                        playlistSongs.Add(allSongs[j]);
-                        break;
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading playlist songs: {ex.Message}");
-        }
+        playlistSongs = await playlistService.LoadPlaylistSongsAsync(playlistId, allSongs);
     }
 
-    // Delete a playlist
+    // Delete a playlist using service
     private async Task DeletePlaylist(int playlistId)
     {
         if (user == null)
@@ -393,11 +304,10 @@ private Dictionary<int, int> playlistSongCounts = new Dictionary<int, int>();
             return;
         }
 
-        try
-        {
-            PlaylistDB playlistDB = new PlaylistDB();
-            await playlistDB.DeletePlaylistAsync(playlistId);
+        bool success = await playlistService.DeletePlaylistAsync(playlistId);
 
+        if (success)
+        {
             // Remove from local list
             for (int i = 0; i < userPlaylists.Count; i++)
             {
@@ -417,13 +327,9 @@ private Dictionary<int, int> playlistSongCounts = new Dictionary<int, int>();
 
             StateHasChanged();
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error deleting playlist: {ex.Message}");
-        }
     }
 
-    // Remove a song from the currently selected playlist
+    // Remove a song from the currently selected playlist using service
     private async Task RemoveSongFromPlaylist(int songId)
     {
         if (selectedPlaylist == null)
@@ -431,11 +337,10 @@ private Dictionary<int, int> playlistSongCounts = new Dictionary<int, int>();
             return;
         }
 
-        try
-        {
-            PlaylistSongDB playlistSongDB = new PlaylistSongDB();
-            await playlistSongDB.RemoveSongFromPlaylistAsync(selectedPlaylist.playlistid, songId);
+        bool success = await playlistService.RemoveSongFromPlaylistAsync(selectedPlaylist.playlistid, songId);
 
+        if (success)
+        {
             // Remove from local list
             for (int i = 0; i < playlistSongs.Count; i++)
             {
@@ -448,37 +353,15 @@ private Dictionary<int, int> playlistSongCounts = new Dictionary<int, int>();
 
             StateHasChanged();
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error removing song from playlist: {ex.Message}");
-        }
     }
 
-    // Get the number of songs in a playlist
-    private async Task<int> GetSongCountAsync(int playlistId)
+    // Load song counts for all playlists at once using service
+    private async Task LoadSongCountsAsync()
     {
-        try
-        {
-            PlaylistSongDB playlistSongDB = new PlaylistSongDB();
-            int count = await playlistSongDB.GetSongCountAsync(playlistId);
-            return count;
-        }
-        catch
-        {
-            return 0;
-        }
+        playlistSongCounts = await playlistService.LoadSongCountsAsync(userPlaylists);
     }
 
-    // Convert seconds to "minutes:seconds" format
-    // Example: 125 seconds becomes "2:05"
-    private string FormatDuration(int seconds)
-    {
-        int minutes = seconds / 60;
-        int secs = seconds % 60;
-        return $"{minutes}:{secs:D2}";
-    }
-
-    // Add the selected song to the currently selected playlist
+    // Add the selected song to the currently selected playlist using service
     private async Task AddSongToPlaylist()
     {
         if (selectedPlaylist == null)
@@ -497,84 +380,47 @@ private Dictionary<int, int> playlistSongCounts = new Dictionary<int, int>();
 
         isAddingSong = true;
 
-        try
+        // Check if song already exists in this playlist using service
+        bool exists = await playlistService.SongExistsInPlaylistAsync(selectedPlaylist.playlistid, selectedSongId);
+        if (exists)
         {
-            PlaylistSongDB playlistSongDB = new PlaylistSongDB();
-
-            // Check if song already exists in this playlist
-            bool exists = await playlistSongDB.SongExistsInPlaylistAsync(selectedPlaylist.playlistid, selectedSongId);
-            if (exists)
-            {
-                message = "Song is already in this playlist.";
-                return;
-            }
-
-            // Get the next position for the song (last position + 1)
-            int nextPosition = playlistSongs.Count + 1;
-
-            // Add the song to the playlist
-            int rows = await playlistSongDB.AddSongToPlaylistAsync(selectedPlaylist.playlistid, selectedSongId, nextPosition);
-            if (rows != 1)
-            {
-                message = "Error adding song to playlist.";
-                return;
-            }
-
-            // Reload the playlist songs to show the new addition
-            await LoadPlaylistSongs(selectedPlaylist.playlistid);
-
-            // Reset selection
-            selectedSongId = 0;
-
-            message = "Song added to playlist successfully!";
-            StateHasChanged();
-
-            // Clear message after 2 seconds
-            await Task.Delay(2000);
-            message = "";
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            message = $"Error adding song to playlist: {ex.Message}";
-            Console.WriteLine($"Error adding song to playlist: {ex}");
-        }
-        finally
-        {
+            message = "Song is already in this playlist.";
             isAddingSong = false;
-            StateHasChanged();
+            return;
         }
-    }
 
-    // Load song counts for all playlists at once
-    private async Task LoadSongCountsAsync()
-    {
-        playlistSongCounts.Clear();
+        // Get the next position for the song (last position + 1)
+        int nextPosition = playlistSongs.Count + 1;
 
-        try
+        // Add the song to the playlist using service
+        int rows = await playlistService.AddSongToPlaylistAsync(selectedPlaylist.playlistid, selectedSongId, nextPosition);
+        if (rows != 1)
         {
-            PlaylistSongDB playlistSongDB = new PlaylistSongDB();
-
-            for (int i = 0; i < userPlaylists.Count; i++)
-            {
-                int playlistId = userPlaylists[i].playlistid;
-
-                int count = await playlistSongDB.GetSongCountAsync(playlistId);
-
-                // Store the result so the UI can use it instantly
-                playlistSongCounts[playlistId] = count;
-            }
+            message = "Error adding song to playlist.";
+            isAddingSong = false;
+            return;
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine("Error loading song counts: " + ex.Message);
-        }
+
+        // Reload the playlist songs to show the new addition
+        await LoadPlaylistSongs(selectedPlaylist.playlistid);
+
+        // Reset selection
+        selectedSongId = 0;
+
+        message = "Song added to playlist successfully!";
+        StateHasChanged();
+
+        // Clear message after 2 seconds
+        await Task.Delay(2000);
+        message = "";
+        StateHasChanged();
+
+        isAddingSong = false;
     }
-
 
     // Navigate to songs page
     private void GoToSongs()
-    {   
+    {
         Nav.NavigateTo("/songs");
     }
 }

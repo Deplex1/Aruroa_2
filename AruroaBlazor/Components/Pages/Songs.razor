@@ -1,7 +1,7 @@
 ﻿@page "/songs"
-@using DBL
 @using Models
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using Services
 
 @inject NavigationManager Nav
 @inject ProtectedSessionStorage Storage
@@ -37,45 +37,27 @@
             {
                 Song song = songList[i];
 
-                // Calculate average rating manually
-                double total = 0;
-                int count = 0;
-
-                for (int j = 0; j < allRatings.Count; j++)
-                {
-                    if (allRatings[j].songid == song.songID)
-                    {
-                        total += allRatings[j].rating;
-                        count++;
-                    }
-                }
-
+                // Get rating stats from dictionary (already loaded from SQL)
                 double avgRating = 0;
-                if (count > 0)
+                int ratingCount = 0;
+                if (ratingStats.ContainsKey(song.songID))
                 {
-                    avgRating = total / count;
+                    avgRating = ratingStats[song.songID].average;
+                    ratingCount = ratingStats[song.songID].count;
                 }
 
-                <div class="song-card">
+                <div class="song-card @GetSongCardClass(song.songID)">
                     <h3>@song.title</h3>
-                    <p class="song-info">Duration: @FormatDuration(song.duration) | Plays: @song.plays | Avg: @avgRating.ToString("0.0") (@count ratings)</p>
+                    <p class="song-info">Duration: @uiHelper.FormatDuration(song.duration) | Plays: @song.plays | Avg: @uiHelper.FormatRating(avgRating) (@ratingCount ratings)</p>
 
                     @if (song.audioData != null)
                     {
-                        <div class="custom-audio-player">
-                            <audio id="audio-@song.songID"
-                                   controls
-                                   preload="metadata"
-                                   @onended="() => OnSongEnded(song.songID)"
-                                   @onplay="() => OnSongStarted(song.songID)">
-                                <source src="@song.GetAudioSource(song.audioData)" />
-                                Your browser does not support audio.
-                            </audio>
-                        </div>
-
                         <div class="action-buttons">
+                            <button class="play-now-btn" @onclick="() => PlayNow(song)">
+                                ▶ Play Now
+                            </button>
                             <button class="add-to-queue-btn" @onclick="() => AddToQueue(song)">
-                                Add to Queue
+                                + Add to Queue
                             </button>
                         </div>
                     }
@@ -123,76 +105,53 @@
             }
         }
     </div>
-
-    <!-- Queue Sidebar -->
-    <div class="queue-sidebar">
-        <h3>Play Queue</h3>
-
-        <div class="queue-list">
-            @if (playQueue.Count == 0)
-            {
-                <div class="no-queue">
-                    No songs in queue. Add songs to start playing!
-                </div>
-            }
-            else
-            {
-                @for (int i = 0; i < playQueue.Count; i++)
-                {
-                    Song queueSong = playQueue[i];
-                    string queueClass = "";
-                    if (currentlyPlayingSongId == queueSong.songID)
-                    {
-                        queueClass = "playing";
-                    }
-
-                    <div class="queue-item @queueClass" @onclick="() => PlayFromQueue(i)">
-                        <div class="queue-item-title">@queueSong.title</div>
-                        <div class="queue-item-duration">@FormatDuration(queueSong.duration)</div>
-                    </div>
-                }
-            }
-        </div>
-
-        @if (playQueue.Count > 0)
-        {
-            <button class="clear-queue-btn" @onclick="ClearQueue">Clear Queue</button>
-        }
-    </div>
 </div>
 
 @code
 {
-    // List of all songs displayed on the page
+    // Service instances
+    private SongService songService = new SongService();
+    private UIHelperService uiHelper = new UIHelperService();
+    private GlobalAudioPlayerService playerService = new GlobalAudioPlayerService();
+
+    // UI state variables
     private List<Song> songList = new List<Song>();
-
-    // List of ALL ratings from database (for calculating averages)
     private List<Rating> allRatings = new List<Rating>();
-
-    // Search text entered by user
+    private Dictionary<int, (double average, int count)> ratingStats = new Dictionary<int, (double, int)>();
     private string searchText = "";
-
-    // Currently logged-in user (null if not logged in)
     private User? currentUser;
-
-    // Play queue management
-    private List<Song> playQueue = new List<Song>();
-    private int currentlyPlayingSongId = -1;
-
-    // User's personal ratings (songId -> rating value 1-5)
     private Dictionary<int, int> userRatings = new Dictionary<int, int>();
-
-    // Temporary ratings shown when hovering over stars (songId -> star number)
     private Dictionary<int, int> previewRatings = new Dictionary<int, int>();
 
-    // Called after component renders for the first time
+    // Currently playing song ID (from global player)
+    private int currentlyPlayingSongId = -1;
+
+    // Lifecycle method - loads data on first render
     protected override async Task OnAfterRenderAsync(bool first)
     {
         if (first)
         {
             await LoadCurrentUser();
             await LoadAllSongs();
+
+            // Subscribe to player state changes
+            playerService.OnStateChanged += OnPlayerStateChanged;
         }
+    }
+
+    // Called when global player state changes
+    private void OnPlayerStateChanged()
+    {
+        Song? currentSong = playerService.GetCurrentSong();
+        if (currentSong != null)
+        {
+            currentlyPlayingSongId = currentSong.songID;
+        }
+        else
+        {
+            currentlyPlayingSongId = -1;
+        }
+        StateHasChanged();
     }
 
     // Load current user from session storage
@@ -209,56 +168,25 @@
         }
     }
 
-    // Load all songs from database along with all their ratings
+    // Load all songs from database using service
     private async Task LoadAllSongs()
     {
-        SongDB db = new SongDB();
-        songList = await db.SelectAllSongsAsync();
-
-        RatingDB ratingDB = new RatingDB();
-        allRatings.Clear();
-
-        // Load all ratings for all songs
-        // This is for calculating average ratings displayed to everyone
-        for (int i = 0; i < songList.Count; i++)
-        {
-            List<Rating> songRatings = await ratingDB.GetSongRatingsAsync(songList[i].songID);
-            for (int j = 0; j < songRatings.Count; j++)
-            {
-                allRatings.Add(songRatings[j]);
-            }
-        }
+        songList = await songService.LoadAllSongsAsync();
+        allRatings = await songService.LoadAllRatingsForSongsAsync(songList);
+        
+        // Load rating stats for all songs in one SQL query
+        ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
 
         // If user is logged in, also load their personal ratings
         if (currentUser != null)
         {
-            await LoadUserRatings();
+            userRatings = await songService.LoadUserRatingsAsync(currentUser.userid);
         }
 
         StateHasChanged();
     }
 
-    // Load the logged-in user's personal ratings
-    // These are stored in userRatings dictionary for quick lookup
-    private async Task LoadUserRatings()
-    {
-        if (currentUser == null)
-        {
-            return;
-        }
-
-        RatingDB ratingDB = new RatingDB();
-        List<Rating> ratings = await ratingDB.GetUserRatingsAsync(currentUser.userid);
-
-        userRatings.Clear();
-        for (int i = 0; i < ratings.Count; i++)
-        {
-            userRatings[ratings[i].songid] = ratings[i].rating;
-        }
-    }
-
     // Called when user types in the search box
-    // If they clear the search box, reload all songs
     private async Task OnSearchInput(ChangeEventArgs e)
     {
         searchText = e.Value?.ToString() ?? "";
@@ -268,26 +196,15 @@
         }
     }
 
-    // Search for songs based on search text
-    // FIXED: No longer reloads all songs after searching!
+    // Search for songs using service
     private async Task Search()
     {
-        SongDB db = new SongDB();
-        songList = await db.SearchSongsAsync(searchText.Trim());
-
-        // Reload ratings for the search results
-        RatingDB ratingDB = new RatingDB();
-        allRatings.Clear();
-
-        for (int i = 0; i < songList.Count; i++)
-        {
-            List<Rating> songRatings = await ratingDB.GetSongRatingsAsync(songList[i].songID);
-            for (int j = 0; j < songRatings.Count; j++)
-            {
-                allRatings.Add(songRatings[j]);
-            }
-        }
-
+        songList = await songService.SearchSongsAsync(searchText.Trim());
+        allRatings = await songService.LoadAllRatingsForSongsAsync(songList);
+        
+        // Reload rating stats for search results
+        ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
+        
         StateHasChanged();
     }
 
@@ -298,113 +215,29 @@
         await LoadAllSongs();
     }
 
-    // Convert duration in seconds to "minutes:seconds" format
-    // Example: 125 seconds becomes "2:05"
-    private string FormatDuration(int seconds)
+    // Play a song immediately using global player
+    private async Task PlayNow(Song song)
     {
-        int minutes = seconds / 60;
-        int secs = seconds % 60;
-        return minutes.ToString() + ":" + secs.ToString("00");
-    }
-
-    // ===== QUEUE MANAGEMENT =====
-
-    // Add a song to the play queue
-    private void AddToQueue(Song song)
-    {
-        // Check if song is already in queue
-        bool alreadyInQueue = false;
-        for (int i = 0; i < playQueue.Count; i++)
-        {
-            if (playQueue[i].songID == song.songID)
-            {
-                alreadyInQueue = true;
-                break;
-            }
-        }
-
-        // Only add if not already there
-        if (alreadyInQueue == false)
-        {
-            playQueue.Add(song);
-            StateHasChanged();
-        }
-    }
-
-    // Play a specific song from the queue
-    private void PlayFromQueue(int index)
-    {
-        if (index < 0)
-        {
-            return;
-        }
-        if (index >= playQueue.Count)
-        {
-            return;
-        }
-
-        Song songToPlay = playQueue[index];
-        currentlyPlayingSongId = songToPlay.songID;
-        StateHasChanged();
-
-        // NOTE: Actual audio playback control would require JavaScript interop
-        // This just tracks which song should be playing
-    }
-
-    // Called when a song starts playing
-    // Increments the play count in database
-    private void OnSongStarted(int songId)
-    {
-        currentlyPlayingSongId = songId;
+        playerService.PlayNow(song);
 
         // Increment play count in background
-        Task.Run(async () =>
-        {
-            SongDB db = new SongDB();
-            await db.AddPlayAsync(songId);
-        });
-
-        StateHasChanged();
+        await songService.IncrementPlayCountAsync(song.songID);
     }
 
-    // Called when a song finishes playing
-    // Automatically plays the next song in queue if available
-    private void OnSongEnded(int songId)
+    // Add a song to the play queue without playing
+    private void AddToQueue(Song song)
     {
-        // Find current song in queue
-        int currentIndex = -1;
-        for (int i = 0; i < playQueue.Count; i++)
-        {
-            if (playQueue[i].songID == songId)
-            {
-                currentIndex = i;
-                break;
-            }
-        }
-
-        // Play next song if it exists
-        if (currentIndex >= 0)
-        {
-            int nextIndex = currentIndex + 1;
-            if (nextIndex < playQueue.Count)
-            {
-                PlayFromQueue(nextIndex);
-            }
-            else
-            {
-                currentlyPlayingSongId = -1;
-            }
-        }
-
-        StateHasChanged();
+        playerService.AddToQueue(song);
     }
 
-    // Clear all songs from the queue
-    private void ClearQueue()
+    // Get CSS class for song card (highlight if currently playing)
+    private string GetSongCardClass(int songId)
     {
-        playQueue.Clear();
-        currentlyPlayingSongId = -1;
-        StateHasChanged();
+        if (songId == currentlyPlayingSongId)
+        {
+            return "currently-playing";
+        }
+        return "";
     }
 
     // Navigate to login page
@@ -413,10 +246,7 @@
         Nav.NavigateTo("/login");
     }
 
-    // ===== STAR RATING SYSTEM =====
-
     // Called when mouse hovers over a star
-    // Shows preview of what rating would look like
     void OnHover(int songId, int value)
     {
         if (value > 0)
@@ -431,7 +261,6 @@
     }
 
     // Called when user clicks a star to rate a song
-    // Saves the rating to the database
     private async Task OnClick(int songId, int value)
     {
         if (currentUser == null)
@@ -439,38 +268,43 @@
             return;
         }
 
-        RatingDB ratingDB = new RatingDB();
-        await ratingDB.SaveRatingAsync(currentUser.userid, songId, value);
+        // Save rating using service
+        bool success = await songService.SaveRatingAsync(currentUser.userid, songId, value);
 
-        // Update local rating dictionary
-        userRatings[songId] = value;
-
-        // Also update allRatings list for average calculation
-        bool exists = false;
-        for (int i = 0; i < allRatings.Count; i++)
+        if (success)
         {
-            if (allRatings[i].songid == songId && allRatings[i].userid == currentUser.userid)
+            // Update local rating dictionary
+            userRatings[songId] = value;
+
+            // Also update allRatings list for average calculation
+            bool exists = false;
+            for (int i = 0; i < allRatings.Count; i++)
             {
-                allRatings[i].rating = value;
-                exists = true;
+                if (allRatings[i].songid == songId && allRatings[i].userid == currentUser.userid)
+                {
+                    allRatings[i].rating = value;
+                    exists = true;
+                }
             }
-        }
-        if (exists == false)
-        {
-            allRatings.Add(new Rating
+            if (exists == false)
             {
-                songid = songId,
-                userid = currentUser.userid,
-                rating = value,
-                daterated = System.DateTime.Now
-            });
-        }
+                allRatings.Add(new Rating
+                {
+                    songid = songId,
+                    userid = currentUser.userid,
+                    rating = value,
+                    daterated = System.DateTime.Now
+                });
+            }
 
-        StateHasChanged();
+            // Reload rating stats from SQL to get updated average and count
+            ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
+
+            StateHasChanged();
+        }
     }
 
     // Determine which CSS class to apply to stars for LOGGED-IN users
-    // Shows their personal rating with hover preview
     string GetStarClass(int songId, int starIndex)
     {
         // First check if we are hovering
@@ -506,25 +340,17 @@
     }
 
     // Determine which CSS class to apply to stars for NON-LOGGED users
-    // Shows the average rating from all users (read-only)
     string GetStarClassForDisplay(int songId, int starIndex)
     {
-        // Calculate average rating for this song
-        double total = 0;
-        int count = 0;
-
-        for (int i = 0; i < allRatings.Count; i++)
+        // Get average rating from stats dictionary (already loaded from SQL)
+        double avgRating = 0;
+        if (ratingStats.ContainsKey(songId))
         {
-            if (allRatings[i].songid == songId)
-            {
-                total += allRatings[i].rating;
-                count++;
-            }
+            avgRating = ratingStats[songId].average;
         }
 
-        if (count > 0)
+        if (avgRating > 0)
         {
-            double avgRating = total / count;
             int roundedAvg = (int)Math.Round(avgRating);
 
             if (starIndex <= roundedAvg)
@@ -539,4 +365,4 @@
 
         return "gray";
     }
-}       
+}

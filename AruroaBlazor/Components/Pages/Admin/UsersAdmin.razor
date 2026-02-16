@@ -1,8 +1,8 @@
 ﻿@page "/adminDashboard/manageUsers"
 
 @using Models
-@using DBL
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using Services
 @inject ProtectedSessionStorage Storage
 @inject NavigationManager Nav
 
@@ -66,10 +66,15 @@ else
 }
 
 @code {
+    // Service instance
+    private UserAdminService userService = new UserAdminService();
+
+    // UI state variables
     private User user = null;
     private List<User> users = new List<User>();
     private string message = "";
 
+    // Lifecycle method - loads data on first render
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender == false)
@@ -89,35 +94,27 @@ else
         }
     }
 
+    // Load all users from database using service
     private async Task LoadUsers()
     {
-        try
+        users = await userService.LoadAllUsersAsync();
+        if (users.Count == 0)
         {
-            UserDB uDB = new UserDB();
-            users = await uDB.GetAllUsersAsync();
-        }
-        catch (Exception ex)
-        {
-            message = "Error loading users: " + ex.Message;
+            message = "Error loading users";
         }
     }
 
+    // Delete a user by index using service
     private async Task DeleteUserByIndex(int index)
     {
-        if (index < 0)
-        {
-            return;
-        }
-        if (index >= users.Count)
-        {
-            return;
-        }
+        // Get user by index using service
+        User targetUser = userService.GetUserByIndex(index, users);
 
-        User u = users[index];
-
-        if (u.userid == user.userid)
+        // Validate deletion using service
+        string validationError = userService.ValidateUserDeletion(targetUser, user);
+        if (validationError != null)
         {
-            message = "You cannot delete yourself!";
+            message = validationError;
             return;
         }
 
@@ -127,66 +124,47 @@ else
             return;
         }
 
-        try
+        // Delete user using service
+        bool success = await userService.DeleteUserAsync(targetUser.userid);
+        if (success)
         {
-            UserDB uDB = new UserDB();
-            await uDB.DeleteUserAsync(u.userid);
             message = "User deleted successfully.";
             await LoadUsers();
         }
-        catch (Exception ex)
+        else
         {
-            message = "Error deleting user: " + ex.Message;
+            message = "Error deleting user.";
         }
     }
 
+    // Toggle admin status by index using service
     private async Task ToggleAdminByIndex(int index)
     {
-        if (index < 0)
-        {
-            message = "Invalid user selection!";
-            return;
-        }
-        if (index >= users.Count)
-        {
-            message = "Invalid user selection!";
-            return;
-        }
+        // Get user by index using service
+        User selectedUser = userService.GetUserByIndex(index, users);
 
-        User selectedUser = users[index];
-
-        if (selectedUser.userid == user.userid)
+        // Validate toggle using service
+        string validationError = userService.ValidateAdminToggle(selectedUser, user);
+        if (validationError != null)
         {
-            message = "You cannot change your own admin status!";
+            message = validationError;
             return;
         }
 
-        try
+        // Toggle admin status using service
+        bool success = await userService.ToggleAdminStatusAsync(selectedUser);
+        if (success)
         {
-            Dictionary<string, object> fieldsToUpdate = new Dictionary<string, object>();
-
-            if (selectedUser.IsAdmin == 1)
-            {
-                fieldsToUpdate.Add("IsAdmin", 0);
-            }
-            else
-            {
-                fieldsToUpdate.Add("IsAdmin", 1);
-            }
-
-            UserDB uDB = new UserDB();
-            await uDB.UpdateUserAsync(selectedUser.userid, fieldsToUpdate);
-
             await LoadUsers();
-
             message = "User admin status updated successfully.";
         }
-        catch (Exception ex)
+        else
         {
-            message = "Error updating user: " + ex.Message;
+            message = "Error updating user.";
         }
     }
 
+    // Simple confirmation helper (always returns true for now)
     private async Task<bool> ConfirmAsync(string text)
     {
         return true;

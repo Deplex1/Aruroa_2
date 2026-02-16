@@ -1,7 +1,7 @@
 ﻿@page "/profile"
 @using Models
-@using DBL
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using Services
 @inject NavigationManager Nav
 @inject ProtectedSessionStorage Storage
 
@@ -131,10 +131,15 @@ else
 }
 
 @code {
+    // Service instance
+    private ProfileService profileService = new ProfileService();
+
+    // UI state variables
     private User? user;
     private List<Song> UserSongs = new List<Song>();
     private List<Playlist> UserPlaylists = new List<Playlist>();
 
+    // Lifecycle method - loads data on first render
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         var result = await Storage.GetAsync<User>("user");
@@ -154,6 +159,7 @@ else
         StateHasChanged();
     }
 
+    // Load user data using service
     private async Task LoadUserData()
     {
         if (user == null)
@@ -161,22 +167,11 @@ else
             return;
         }
 
-        SongDB songDB = new SongDB();
-        List<Song> songs = await songDB.SelectSongsByUserIDAsync(user.userid);
-
-        if (songs != null)
-        {
-            UserSongs = songs;
-        }
-        else
-        {
-            UserSongs = new List<Song>();
-        }
-
-        PlaylistDB playlistDB = new PlaylistDB();
-        UserPlaylists = await playlistDB.GetUserPlaylistsAsync(user.userid);
+        UserSongs = await profileService.LoadUserSongsAsync(user.userid);
+        UserPlaylists = await profileService.LoadUserPlaylistsAsync(user.userid);
     }
 
+    // Delete a song using service
     private async Task DeleteSong(int songId)
     {
         if (user == null)
@@ -184,33 +179,30 @@ else
             return;
         }
 
-        SongDB songDB = new SongDB();
-        await songDB.DeleteSongAsync(songId);
+        bool success = await profileService.DeleteSongAsync(songId);
 
-        for (int i = 0; i < UserSongs.Count; i++)
+        if (success)
         {
-            if (UserSongs[i].songID == songId)
-            {
-                UserSongs.RemoveAt(i);
-                break;
-            }
+            // Remove from local list using service
+            profileService.RemoveSongFromList(songId, UserSongs);
+            StateHasChanged();
         }
-
-        StateHasChanged();
     }
 
-
+    // Navigate to upload page
     private void GoUpload()
     {
         Nav.NavigateTo("/upload");
     }
 
+    // Logout user
     private async Task Logout()
     {
         await Storage.DeleteAsync("user");
         Nav.NavigateTo("/login", true);
     }
 
+    // Handle profile image selection using service
     private async Task OnProfileImageSelected(InputFileChangeEventArgs e)
     {
         if (user == null)
@@ -224,34 +216,28 @@ else
             return;
         }
 
-        using var stream = file.OpenReadStream(5 * 1024 * 1024);
-        using var ms = new MemoryStream();
-
-        await stream.CopyToAsync(ms);
-
-        byte[] imageBytes = ms.ToArray();
-        user.profilepicture = imageBytes;
-
-        UserDB userDB = new UserDB();
-        await userDB.UpdateUserAsync(
-            user.userid,
-            new Dictionary<string, object>
-            {
-                { "profilepicture", imageBytes }
-            }
-        );
-
-        await Storage.SetAsync("user", user);
-        StateHasChanged();
-    }
-
-    private string? GetProfileImage(byte[]? imageData)
-    {
-        if (imageData == null || imageData.Length == 0)
+        // Process image using service
+        byte[] imageBytes = await profileService.ProcessProfileImageAsync(file);
+        if (imageBytes == null)
         {
-            return null;
+            return;
         }
 
-        return "data:image/png;base64," + Convert.ToBase64String(imageData);
+        user.profilepicture = imageBytes;
+
+        // Update profile picture using service
+        bool success = await profileService.UpdateProfilePictureAsync(user.userid, imageBytes);
+
+        if (success)
+        {
+            await Storage.SetAsync("user", user);
+            StateHasChanged();
+        }
+    }
+
+    // Get profile image data URL using service
+    private string? GetProfileImage(byte[]? imageData)
+    {
+        return profileService.GetProfileImageDataUrl(imageData);
     }
 }

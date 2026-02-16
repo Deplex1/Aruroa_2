@@ -1,7 +1,6 @@
 ﻿using Models;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
@@ -82,7 +81,17 @@ namespace DBL
             };
 
             var list = await SelectAllAsync(parameters);
-            return list.Any(ps => ps.songid == songId);
+            
+            // Check if song exists using explicit for loop
+            for (int i = 0; i < list.Count; i = i + 1)
+            {
+                if (list[i].songid == songId)
+                {
+                    return true;
+                }
+            }
+            
+            return false;
         }
 
         public async Task UpdateSongPositionAsync(int playlistId, int songId, int newPosition)
@@ -109,15 +118,44 @@ namespace DBL
                 return 0;
             }
 
-            return songs.Max(s => s.position);
+            // Find max position using explicit for loop
+            int maxPosition = 0;
+            for (int i = 0; i < songs.Count; i = i + 1)
+            {
+                if (songs[i].position > maxPosition)
+                {
+                    maxPosition = songs[i].position;
+                }
+            }
+
+            return maxPosition;
         }
 
         public async Task SwapSongPositionsAsync(int playlistId, int songId1, int songId2)
         {
             var songs = await GetSongsInPlaylistAsync(playlistId);
 
-            var s1 = songs.FirstOrDefault(s => s.songid == songId1);
-            var s2 = songs.FirstOrDefault(s => s.songid == songId2);
+            // Find song 1 using explicit for loop
+            PlaylistSong s1 = null;
+            for (int i = 0; i < songs.Count; i = i + 1)
+            {
+                if (songs[i].songid == songId1)
+                {
+                    s1 = songs[i];
+                    break;
+                }
+            }
+
+            // Find song 2 using explicit for loop
+            PlaylistSong s2 = null;
+            for (int i = 0; i < songs.Count; i = i + 1)
+            {
+                if (songs[i].songid == songId2)
+                {
+                    s2 = songs[i];
+                    break;
+                }
+            }
 
             if (s1 == null || s2 == null)
             {
@@ -136,6 +174,92 @@ namespace DBL
             return songs.Count;
         }
 
+        /// <summary>
+        /// Gets song counts for ALL playlists in one SQL query using GROUP BY.
+        /// This is MUCH more efficient than calling GetSongCountAsync for each playlist.
+        /// Returns a dictionary mapping playlistId to song count.
+        /// </summary>
+        public async Task<Dictionary<int, int>> GetAllPlaylistSongCountsAsync()
+        {
+            Dictionary<int, int> counts = new Dictionary<int, int>();
+
+            // Use SQL GROUP BY to get all counts in one query
+            string sql = "SELECT playlistid, COUNT(*) as song_count " +
+                        "FROM playlistsongs " +
+                        "GROUP BY playlistid";
+
+            Dictionary<string, object> parameters = new Dictionary<string, object>();
+
+            // Execute query and get raw rows
+            List<object[]> rows = await ExecuteQueryAsync(sql, parameters);
+
+            // Process results
+            for (int i = 0; i < rows.Count; i = i + 1)
+            {
+                object[] row = rows[i];
+                
+                int playlistId = Convert.ToInt32(row[0]);
+                int count = Convert.ToInt32(row[1]);
+
+                counts[playlistId] = count;
+            }
+
+            return counts;
+        }
+
+        /// <summary>
+        /// Gets songs in a playlist with full song details using SQL JOIN.
+        /// This is MUCH more efficient than loading playlist-song relationships
+        /// and then loading each song individually (N+1 query problem).
+        /// Returns a list of Song objects in the correct order.
+        /// </summary>
+        public async Task<List<Song>> GetPlaylistSongsWithDetailsAsync(int playlistId)
+        {
+            // Use SQL JOIN to get all song data in one query
+            // ORDER BY position to maintain playlist order
+            string sql = "SELECT s.songID, s.title, s.audioData, s.userid, s.uploaded, s.duration, s.plays " +
+                        "FROM songs s " +
+                        "INNER JOIN playlistsongs ps ON s.songID = ps.songid " +
+                        "WHERE ps.playlistid = @playlistid " +
+                        "ORDER BY ps.position";
+
+            Dictionary<string, object> parameters = new Dictionary<string, object>();
+            parameters.Add("playlistid", playlistId);
+
+            // Execute query and get raw rows
+            List<object[]> rows = await ExecuteQueryAsync(sql, parameters);
+
+            // Convert rows to Song objects
+            List<Song> songs = new List<Song>();
+            for (int i = 0; i < rows.Count; i = i + 1)
+            {
+                object[] row = rows[i];
+
+                Song song = new Song();
+                song.songID = Convert.ToInt32(row[0]);
+                song.title = row[1].ToString();
+                
+                // Handle audioData (can be null or byte array)
+                if (row[2] != null && row[2] != DBNull.Value)
+                {
+                    song.audioData = (byte[])row[2];
+                }
+                else
+                {
+                    song.audioData = null;
+                }
+
+                song.userid = Convert.ToInt32(row[3]);
+                song.uploaded = Convert.ToDateTime(row[4]);
+                song.duration = Convert.ToInt32(row[5]);
+                song.plays = Convert.ToInt32(row[6]);
+
+                songs.Add(song);
+            }
+
+            return songs;
+        }
+
         // ⭐ NEW: Remove song and fix positions automatically
         public async Task RemoveSongAndReorderAsync(int playlistId, int songId)
         {
@@ -145,14 +269,15 @@ namespace DBL
 
             int position = 1;
             
-            foreach (var ps in songs.OrderBy(s => s.position))
+            // Reorder using explicit for loop
+            for (int i = 0; i < songs.Count; i = i + 1)
             {
-                if (ps.position != position)
+                if (songs[i].position != position)
                 {
-                    await UpdateSongPositionAsync(playlistId, ps.songid, position);
+                    await UpdateSongPositionAsync(playlistId, songs[i].songid, position);
                 }
 
-                position++;
+                position = position + 1;
             }
         }
     }

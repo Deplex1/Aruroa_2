@@ -66,6 +66,19 @@ namespace DBL
         }
 
         /// <summary>
+        /// Executes a SQL query and returns raw rows as object arrays.
+        /// This is useful for custom queries that don't map to the model type T.
+        /// For example: aggregate queries with GROUP BY, AVG(), COUNT(), etc.
+        /// </summary>
+        /// <param name="query">SQL string with parameters</param>
+        /// <param name="parameters">Dictionary (Key & Value)</param>
+        /// <returns>List of object arrays (each array is one row)</returns>
+        protected async Task<List<object[]>> ExecuteQueryAsync(string query, Dictionary<string, object> parameters)
+        {
+            return await StingListSelectAllAsync(query, parameters);
+        }
+
+        /// <summary>
         /// Insert new records in a table using INSERT Statement.
         /// </summary>
         /// <param name="keyAndValue">Dictionary (Key & Value)</param>

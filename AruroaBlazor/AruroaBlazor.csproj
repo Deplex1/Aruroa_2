@@ -17,6 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DBL\DBL.csproj" />
     <ProjectReference Include="..\Models\Models.csproj" />
+    <ProjectReference Include="..\Services\Services.csproj" />
     <ProjectReference Include="..\SongManagment\SongManagment.csproj" />
   </ItemGroup>
 

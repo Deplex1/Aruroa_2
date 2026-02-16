@@ -25,24 +25,20 @@ namespace Models
         // It creates a "data URL" that the HTML <audio> tag can use
         public string GetAudioSource(byte[] data)
         {
-            // First check if we actually have audio data
             if (data == null || data.Length == 0)
             {
+                Console.WriteLine("Audio data is null or empty");
                 return "";
             }
 
             try
             {
-                // Step 1: Figure out what TYPE of audio file this is (MP3, WAV, AAC, etc.)
                 string mimeType = GetAudioMimeType(data);
+                Console.WriteLine($"Audio file size: {data.Length} bytes, MIME type: {mimeType}");
 
-                // Step 2: Convert the binary data to Base64 string
-                // Base64 is a way to represent binary data as text
                 string base64 = Convert.ToBase64String(data);
+                Console.WriteLine($"Base64 length: {base64.Length} characters");
 
-                // Step 3: Create a data URL that looks like:
-                // "data:audio/mpeg;base64,ABC123XYZ..."
-                // The browser knows how to play this!
                 return $"data:{mimeType};base64,{base64}";
             }
             catch (Exception ex)

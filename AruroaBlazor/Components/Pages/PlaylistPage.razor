@@ -1,8 +1,8 @@
 ﻿    @page "/playlist/{id:int}"
 
 @using Models
-@using DBL
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using Services
 @inject ProtectedSessionStorage Storage
 @inject NavigationManager Nav
 
@@ -53,19 +53,23 @@ else
 
 @code
 {
+    // Service instance
+    private PlaylistPageService playlistService = new PlaylistPageService();
+
+    // Route parameter
     [Parameter]
     public int id { get; set; }
 
+    // UI state variables
     private User user;
     private Playlist playlist;
-
     private List<Song> songs = new List<Song>();
     private List<Song> allSongs = new List<Song>();
     private List<Song> filteredSongs = new List<Song>();
-
     private bool ShowAddSongs = false;
     private int selectedSongId = 0;
 
+    // Lifecycle method - loads data on first render
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender == false)
@@ -92,10 +96,10 @@ else
         }
     }
 
+    // Load playlist using service
     private async Task LoadPlaylist()
     {
-        PlaylistDB playlistDB = new PlaylistDB();
-        playlist = await playlistDB.SelectByIdAsync(id);
+        playlist = await playlistService.LoadPlaylistByIdAsync(id);
 
         if (playlist == null)
         {
@@ -103,31 +107,17 @@ else
             return;
         }
 
-        PlaylistSongDB psDB = new PlaylistSongDB();
-        List<PlaylistSong> playlistSongs = await psDB.GetSongsInPlaylistAsync(id);
-
-        SongDB songDB = new SongDB();
-        songs.Clear();
-
-        for (int i = 0; i < playlistSongs.Count; i++)
-        {
-            PlaylistSong ps = playlistSongs[i];
-            Song song = await songDB.SelectByIdAsync(ps.songid);
-
-            if (song != null)
-            {
-                songs.Add(song);
-            }
-        }
+        songs = await playlistService.LoadPlaylistSongsAsync(id);
     }
 
+    // Load all songs using service
     private async Task LoadAllSongs()
     {
-        SongDB songDB = new SongDB();
-        allSongs = await songDB.SelectAllSongsAsync();
+        allSongs = await playlistService.LoadAllSongsAsync();
         FilterSongs();
     }
 
+    // Toggle add songs section
     private void ToggleAddSongs()
     {
         if (ShowAddSongs == true)
@@ -142,30 +132,13 @@ else
         FilterSongs();
     }
 
+    // Filter songs using service
     private void FilterSongs()
     {
-        filteredSongs.Clear();
-
-        for (int i = 0; i < allSongs.Count; i++)
-        {
-            Song candidate = allSongs[i];
-            bool existsInPlaylist = false;
-
-            for (int j = 0; j < songs.Count; j++)
-            {
-                if (songs[j].songID == candidate.songID)
-                {
-                    existsInPlaylist = true;
-                }
-            }
-
-            if (existsInPlaylist == false)
-            {
-                filteredSongs.Add(candidate);
-            }
-        }
+        filteredSongs = playlistService.FilterAvailableSongs(allSongs, songs);
     }
 
+    // Add song to playlist using service
     private async Task AddSongToPlaylist()
     {
         if (selectedSongId == 0)
@@ -173,58 +146,88 @@ else
             return;
         }
 
-        PlaylistSongDB psDB = new PlaylistSongDB();
-        int maxPos = await psDB.GetMaxPositionInPlaylistAsync(id);
+        int maxPos = await playlistService.GetMaxPositionAsync(id);
         int newPosition = maxPos + 1;
 
-        await psDB.AddSongToPlaylistAsync(id, selectedSongId, newPosition);
+        bool success = await playlistService.AddSongToPlaylistAsync(id, selectedSongId, newPosition);
 
-        selectedSongId = 0;
-        ShowAddSongs = false;
+        if (success)
+        {
+            selectedSongId = 0;
+            ShowAddSongs = false;
 
-        await LoadPlaylist();
-        FilterSongs();
+            await LoadPlaylist();
+            FilterSongs();
+        }
     }
 
+    // Remove song from playlist using service
     private async Task RemoveSong(Song song)
     {
-        PlaylistSongDB psDB = new PlaylistSongDB();
-        await psDB.RemoveSongFromPlaylistAsync(id, song.songID);
+        bool success = await playlistService.RemoveSongFromPlaylistAsync(id, song.songID);
 
-        await LoadPlaylist();
-        FilterSongs();
+        if (success)
+        {
+            await LoadPlaylist();
+            FilterSongs();
+        }
     }
 
+    // Move song up in playlist using service
     private async Task MoveUp(Song song)
     {
-        int index = songs.IndexOf(song);
+        // Find the index of the song using a for loop
+        int index = -1;
+        for (int i = 0; i < songs.Count; i = i + 1)
+        {
+            if (songs[i].songID == song.songID)
+            {
+                index = i;
+                break;
+            }
+        }
 
         if (index <= 0)
         {
             return;
         }
 
-        PlaylistSongDB psDB = new PlaylistSongDB();
-        await psDB.SwapSongPositionsAsync(id, songs[index].songID, songs[index - 1].songID);
+        bool success = await playlistService.SwapSongPositionsAsync(id, songs[index].songID, songs[index - 1].songID);
 
-        await LoadPlaylist();
+        if (success)
+        {
+            await LoadPlaylist();
+        }
     }
 
+    // Move song down in playlist using service
     private async Task MoveDown(Song song)
     {
-        int index = songs.IndexOf(song);
+        // Find the index of the song using a for loop
+        int index = -1;
+        for (int i = 0; i < songs.Count; i = i + 1)
+        {
+            if (songs[i].songID == song.songID)
+            {
+                index = i;
+                break;
+            }
+        }
 
         if (index >= songs.Count - 1)
         {
             return;
         }
 
-        PlaylistSongDB psDB = new PlaylistSongDB();
-        await psDB.SwapSongPositionsAsync(id, songs[index].songID, songs[index + 1].songID);
+        bool success = await playlistService.SwapSongPositionsAsync(id, songs[index].songID, songs[index + 1].songID);
 
-        await LoadPlaylist();
+        if (success)
+        {
+            await LoadPlaylist();
+        }
     }
 
+    // Play all songs (not implemented yet)
     private async Task PlayAll()
     {
         if (songs.Count == 0)
@@ -233,24 +236,18 @@ else
         }
     }
 
+    // Shuffle playlist using service
     private async Task Shuffle()
     {
-        Random rnd = new Random();
+        // Shuffle songs using service
+        songs = playlistService.ShuffleSongs(songs);
 
-        for (int i = songs.Count - 1; i > 0; i--)
+        // Update all positions using service
+        bool success = await playlistService.UpdateAllSongPositionsAsync(id, songs);
+
+        if (success)
         {
-            int swapIndex = rnd.Next(i + 1);
-
-            Song temp = songs[i];
-            songs[i] = songs[swapIndex];
-            songs[swapIndex] = temp;
-        }
-
-        PlaylistSongDB psDB = new PlaylistSongDB();
-
-        for (int i = 0; i < songs.Count; i++)
-        {
-            await psDB.UpdateSongPositionAsync(id, songs[i].songID, i + 1);
+            StateHasChanged();
         }
     }
 }

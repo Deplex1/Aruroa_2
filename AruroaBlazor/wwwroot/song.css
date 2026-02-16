@@ -358,3 +358,42 @@
         max-height: 400px;
     }
 }
+
+/* Currently Playing Indicator */
+.song-card.currently-playing {
+    border: 2px solid #667eea;
+    background: linear-gradient(135deg, #f8f9ff 0%, #f0f2ff 100%);
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.25);
+}
+
+.song-card.currently-playing::before {
+    content: "♪ NOW PLAYING";
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+}
+
+/* Play Now Button */
+.play-now-btn {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s;
+    font-family: inherit;
+}
+
+.play-now-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(17, 153, 142, 0.4);
+}

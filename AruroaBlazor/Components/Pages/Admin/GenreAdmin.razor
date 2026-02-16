@@ -1,7 +1,7 @@
 ﻿@page "/adminDashboard/manageGenres"
 @using Models
-@using DBL
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using Services
 @inject ProtectedSessionStorage Storage
 @inject NavigationManager Nav
 
@@ -486,30 +486,21 @@
 
 @code
 {
-    // Current logged-in user
+    // Service instance
+    private GenreAdminService genreService = new GenreAdminService();
+
+    // UI state variables
     private User? user;
-
-    // List of all genres from database
     private List<Genre> genres = new List<Genre>();
-
-    // Name of new genre being added
     private string newGenreName = "";
-
-    // Message to display to user (success/error/warning)
     private string message = "";
-
-    // CSS class for message styling
     private string messageClass = "";
-
-    // Loading and saving states
     private bool isSaving = false;
     private bool isLoading = false;
     private bool isDeleting = false;
-
-    // Genre selected for deletion (null means no deletion in progress)
     private Genre? genreToDelete = null;
 
-    // Called when component first renders
+    // Lifecycle method - loads data on first render
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender == false)
@@ -537,35 +528,19 @@
         StateHasChanged();
     }
 
-    // Load all genres from database
+    // Load all genres from database using service
     private async Task LoadGenres()
     {
         isLoading = true;
         StateHasChanged();
 
-        try
-        {
-            GenreDB genreDB = new GenreDB();
-            List<Genre> dbGenres = await genreDB.SelectAllGenresAsync();
+        genres = await genreService.LoadGenresAsync();
 
-            genres.Clear();
-            for (int i = 0; i < dbGenres.Count; i++)
-            {
-                genres.Add(dbGenres[i]);
-            }
-        }
-        catch (Exception ex)
-        {
-            ShowMessage("Error loading genres: " + ex.Message, "error");
-        }
-        finally
-        {
-            isLoading = false;
-            StateHasChanged();
-        }
+        isLoading = false;
+        StateHasChanged();
     }
 
-    // Add a new genre to the database
+    // Add a new genre to the database using service
     private async Task AddGenre()
     {
         // Prevent double-clicking
@@ -574,82 +549,41 @@
             return;
         }
 
-        // Validate input
-        if (string.IsNullOrWhiteSpace(newGenreName))
+        // Validate input using service
+        string validationError = genreService.ValidateGenreName(newGenreName, genres);
+        if (validationError != null)
         {
-            ShowMessage("Genre name cannot be empty", "error");
-            return;
-        }
-
-        // Trim and capitalize first letter
-        string trimmedName = newGenreName.Trim();
-
-        // Check for duplicates (case-insensitive)
-        bool isDuplicate = false;
-        for (int i = 0; i < genres.Count; i++)
-        {
-            if (genres[i].name.ToLower() == trimmedName.ToLower())
-            {
-                isDuplicate = true;
-                break;
-            }
-        }
-
-        if (isDuplicate)
-        {
-            ShowMessage("Genre '" + trimmedName + "' already exists!", "warning");
-            return;
-        }
-
-        // Validate length
-        if (trimmedName.Length < 2)
-        {
-            ShowMessage("Genre name must be at least 2 characters long", "error");
-            return;
-        }
-
-        if (trimmedName.Length > 50)
-        {
-            ShowMessage("Genre name must be less than 50 characters", "error");
+            ShowMessage(validationError, "error");
             return;
         }
 
         isSaving = true;
         StateHasChanged();
 
-        try
+        // Add genre using service
+        int rows = await genreService.AddGenreAsync(newGenreName);
+
+        if (rows == 1)
         {
-            GenreDB genreDB = new GenreDB();
-            int rows = await genreDB.AddGenreAsync(trimmedName);
+            ShowMessage("Genre '" + newGenreName.Trim() + "' added successfully!", "success");
+            newGenreName = "";
+            await LoadGenres();
 
-            if (rows == 1)
+            // Clear success message after 3 seconds
+            await Task.Delay(3000);
+            if (messageClass == "message-success")
             {
-                ShowMessage("Genre '" + trimmedName + "' added successfully!", "success");
-                newGenreName = "";
-                await LoadGenres();
-
-                // Clear success message after 3 seconds
-                await Task.Delay(3000);
-                if (messageClass == "message-success")
-                {
-                    message = "";
-                    StateHasChanged();
-                }
-            }
-            else
-            {
-                ShowMessage("Failed to add genre. Please try again.", "error");
+                message = "";
+                StateHasChanged();
             }
         }
-        catch (Exception ex)
+        else
         {
-            ShowMessage("Error: " + ex.Message, "error");
+            ShowMessage("Failed to add genre. Please try again.", "error");
         }
-        finally
-        {
-            isSaving = false;
-            StateHasChanged();
-        }
+
+        isSaving = false;
+        StateHasChanged();
     }
 
     // Show confirmation modal before deleting
@@ -666,7 +600,7 @@
         StateHasChanged();
     }
 
-    // Delete the genre from database
+    // Delete the genre from database using service
     private async Task DeleteGenre()
     {
         if (genreToDelete == null)
@@ -677,46 +611,25 @@
         isDeleting = true;
         StateHasChanged();
 
-        try
+        // Delete genre using service
+        int rowsAffected = await genreService.DeleteGenreAsync(genreToDelete.genreid);
+
+        if (rowsAffected > 0)
         {
-            GenreDB genreDB = new GenreDB();
+            ShowMessage("Genre '" + genreToDelete.name + "' deleted successfully!", "success");
 
-            // Call the method YOU created in GenreDB
-            int rowsAffected = await genreDB.DeleteGenreAsync(genreToDelete.genreid);
-
-            if (rowsAffected > 0)
-            {
-                ShowMessage("Genre '" + genreToDelete.name + "' deleted successfully!", "success");
-
-                // Remove it from the local list so UI updates immediately
-                for (int i = 0; i < genres.Count; i++)
-                {
-                    if (genres[i].genreid == genreToDelete.genreid)
-                    {
-                        genres.RemoveAt(i);
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                ShowMessage("Genre could not be deleted.", "error");
-            }
+            // Remove it from the local list using service
+            genreService.RemoveGenreFromList(genreToDelete.genreid, genres);
         }
-        catch (Exception ex)
+        else
         {
-            // This usually means FK constraint (genre used by songs)
             ShowMessage("Cannot delete genre because it is used by songs.", "error");
-            Console.WriteLine(ex.Message);
         }
-        finally
-        {
-            isDeleting = false;
-            genreToDelete = null;
-            StateHasChanged();
-        }
-    }
 
+        isDeleting = false;
+        genreToDelete = null;
+        StateHasChanged();
+    }
 
     // Handle Enter key press in input field
     private async Task HandleKeyPress(KeyboardEventArgs e)

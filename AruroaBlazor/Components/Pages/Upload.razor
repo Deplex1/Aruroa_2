@@ -1,9 +1,8 @@
 ﻿@page "/upload"
-@using DBL
 @using Models
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
-@using SongManagment
+@using Services
 @inject NavigationManager Nav
 @inject ProtectedSessionStorage Storage
 
@@ -95,16 +94,20 @@ else
 </style>
 
 @code {
+    // Service instances
+    private SongUploadService uploadService = new SongUploadService();
+    private UIHelperService uiHelper = new UIHelperService();
+
+    // UI state variables
     private User? user;
     private IBrowserFile? selectedFile;
     private string title = "";
     private string message = "";
     private bool isUploading = false;
-
-    // CHANGED: Instead of a single genre, we now track MULTIPLE selected genres
     private List<int> selectedGenreIds = new List<int>();
     private List<Genre> availableGenres = new List<Genre>();
 
+    // Lifecycle method - loads data on first render
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         // Only load data on the FIRST render to avoid infinite loops
@@ -129,18 +132,10 @@ else
         }
     }
 
-    // Load all available genres from the database
+    // Load all available genres from the database using service
     private async Task LoadGenres()
     {
-        try
-        {
-            GenreDB genreDB = new GenreDB();
-            availableGenres = await genreDB.SelectAllGenresAsync();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading genres: {ex.Message}");
-        }
+        availableGenres = await uploadService.LoadGenresAsync();
     }
 
     // Check if a specific genre is currently selected
@@ -198,71 +193,20 @@ else
         StateHasChanged();
     }
 
-    // Format file size in human-readable format (KB, MB, GB)
+    // Format file size using UI helper service
     private string FormatFileSize(long bytes)
     {
-        string[] sizes = { "B", "KB", "MB", "GB" };
-        double len = bytes;
-        int order = 0;
-
-        // Keep dividing by 1024 until we get a reasonable number
-        while (len >= 1024 && order < sizes.Length - 1)
-        {
-            order++;
-            len = len / 1024;
-        }
-
-        return $"{len:0.##} {sizes[order]}";
+        return uiHelper.FormatFileSize(bytes);
     }
 
     // Main upload function - validates input and saves to database
     private async Task UploadSong()
     {
-        // VALIDATION STEP 1: Check if user is logged in
-        if (user == null)
+        // Validate upload using service
+        string validationError = uploadService.ValidateUpload(user, title, selectedGenreIds, selectedFile);
+        if (validationError != null)
         {
-            message = "You must be logged in to upload songs.";
-            StateHasChanged();
-            return;
-        }
-
-        // VALIDATION STEP 2: Check if title is provided
-        if (string.IsNullOrWhiteSpace(title))
-        {
-            message = "Please enter a song title.";
-            StateHasChanged();
-            return;
-        }
-
-        // VALIDATION STEP 3: Check if at least one genre is selected
-        if (selectedGenreIds.Count == 0)
-        {
-            message = "Please select at least one genre.";
-            StateHasChanged();
-            return;
-        }
-
-        // VALIDATION STEP 4: Check if file is selected
-        if (selectedFile == null)
-        {
-            message = "Please select an audio file.";
-            StateHasChanged();
-            return;
-        }
-
-        // VALIDATION STEP 5: Check file type (must be audio)
-        if (selectedFile.ContentType.StartsWith("audio/") == false)
-        {
-            message = "Please select a valid audio file.";
-            StateHasChanged();
-            return;
-        }
-
-        // VALIDATION STEP 6: Check file size (maximum 20MB)
-        long maxFileSize = 20 * 1024 * 1024; // 20MB in bytes
-        if (selectedFile.Size > maxFileSize)
-        {
-            message = "File size must be less than 20MB.";
+            message = validationError;
             StateHasChanged();
             return;
         }
@@ -271,122 +215,31 @@ else
         isUploading = true;
         StateHasChanged();
 
-        try
+        // Perform upload using service
+        bool success = await uploadService.UploadSongAsync(user, title, selectedGenreIds, selectedFile);
+
+        if (success)
         {
-            // Log upload details for debugging
-            Console.WriteLine($"=== UPLOAD START ===");
-            Console.WriteLine($"User ID: {user?.userid}");
-            Console.WriteLine($"Title: '{title}'");
-            Console.WriteLine($"Selected Genres: {string.Join(", ", selectedGenreIds)}");
-            Console.WriteLine($"File: {selectedFile?.Name} ({selectedFile?.Size} bytes)");
-            Console.WriteLine($"Content Type: {selectedFile?.ContentType}");
+            message = "Song uploaded successfully!";
 
-            // STEP 1: Read the audio file into memory
-            // OpenReadStream allows us to read files up to 20MB
-            using var stream = selectedFile.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
-            using var ms = new MemoryStream();
-            await stream.CopyToAsync(ms);
+            // Clear form
+            title = "";
+            selectedFile = null;
+            selectedGenreIds.Clear();
 
-            // Convert the file to a byte array for database storage
-            byte[] audioData = ms.ToArray();
-            Console.WriteLine($"Audio data size: {audioData.Length} bytes");
-
-            // STEP 2: Calculate the duration of the audio file
-            // We use TagLib library (in AudioHelper) to read MP3 metadata
-            int duration = await SongManagment.AudioHelper.GetMp3DurationInSeconds(audioData);
-            Console.WriteLine($"Calculated duration: {duration} seconds");
-
-            // STEP 3: Create a new Song object
-            // NOTE: We DO NOT set genreID anymore - that column was removed!
-            Song song = new Song
-            {
-                title = title.Trim(),
-                audioData = audioData,
-                userid = user.userid,
-                uploaded = DateTime.Now,
-                duration = duration,
-                plays = 0
-            };
-
-            Console.WriteLine($"=== SAVING TO DATABASE ===");
-            Console.WriteLine($"Song object created successfully");
-
-            // STEP 4: Insert the song into the database
-            SongDB songDB = new SongDB();
-            int rows = await songDB.AddSongAsync(song);
-
-            Console.WriteLine($"Database insert result: {rows} rows affected");
-
-            // Check if the insert was successful
-            if (rows == 1)
-            {
-                // STEP 5: Get the ID of the song we just inserted
-                // We need this to create the genre relationships
-                List<Song> allSongs = await songDB.SelectAllSongsAsync();
-
-                // Find the song we just added (it should be the last one)
-                int newSongId = 0;
-                for (int i = 0; i < allSongs.Count; i++)
-                {
-                    if (allSongs[i].title == song.title && allSongs[i].userid == user.userid)
-                    {
-                        newSongId = allSongs[i].songID;
-                    }
-                }
-
-                // STEP 6: Add genre relationships to song_genres table
-                if (newSongId > 0)
-                {
-                    SongGenreDB songGenreDB = new SongGenreDB();
-
-                    // Loop through all selected genres and create relationships
-                    for (int i = 0; i < selectedGenreIds.Count; i++)
-                    {
-                        int genreId = selectedGenreIds[i];
-                        await songGenreDB.AddSongGenreAsync(newSongId, genreId);
-                        Console.WriteLine($"Added genre {genreId} to song {newSongId}");
-                    }
-                }
-
-                message = "Song uploaded successfully!";
-                Console.WriteLine($"=== UPLOAD SUCCESS ===");
-
-                // Clear form
-                title = "";
-                selectedFile = null;
-                selectedGenreIds.Clear();
-
-                // Navigate to songs page after 2 seconds
-                await Task.Delay(2000);
-                Nav.NavigateTo("/songs");
-            }
-            else
-            {
-                message = "Error uploading song. Database returned 0 rows affected.";
-                Console.WriteLine($"=== UPLOAD FAILED: Database returned 0 rows ===");
-            }
-        }
-        catch (Exception ex)
-        {
-            // If anything goes wrong, show error message
-            message = $"Upload failed: {ex.Message}";
-            Console.WriteLine($"=== UPLOAD FAILED ===");
-            Console.WriteLine($"Exception: {ex.GetType().Name}");
-            Console.WriteLine($"Message: {ex.Message}");
-            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
-
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
-            }
-
-            Console.WriteLine($"=== END OF ERROR ===");
-        }
-        finally
-        {
-            // Always hide loading state when done
-            isUploading = false;
             StateHasChanged();
+
+            // Navigate to songs page after 2 seconds
+            await Task.Delay(2000);
+            Nav.NavigateTo("/songs");
         }
+        else
+        {
+            message = "Upload failed. Please try again.";
+        }
+
+        // Hide loading state
+        isUploading = false;
+        StateHasChanged();
     }
 }
