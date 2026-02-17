@@ -21,6 +21,7 @@ else
 
     <div class="admin-links" style="display:flex; flex-wrap:wrap; gap:20px; margin-top:20px;">
         <button style="padding:10px 20px; font-size:16px;" @onclick="GoToManageGenres">Manage Genres</button>
+        <button style="padding:10px 20px; font-size:16px;" @onclick="GoToManageGenresRequest">Manage Genres Request</button>
         <button style="padding:10px 20px; font-size:16px;" @onclick="GoToManageUsers">Manage Users</button>
         <button style="padding:10px 20px; font-size:16px;" @onclick="GoToManagePlaylists">Manage Playlists</button>
         <button style="padding:10px 20px; font-size:16px;" @onclick="GoToManageSongs">Manage Songs</button>
@@ -48,7 +49,7 @@ else
         StateHasChanged();
     }
 
-    
+
     private void GoToManageGenres()
     {
         Nav.NavigateTo("/adminDashboard/manageGenres");
@@ -67,5 +68,9 @@ else
     private void GoToManageSongs()
     {
         Nav.NavigateTo("/adminDashboard/manageSongs");
+    }
+    private void GoToManageGenresRequest()
+    {
+        Nav.NavigateTo("/adminDashboard/genreRequests");
     }
 }

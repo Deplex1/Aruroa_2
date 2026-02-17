@@ -112,7 +112,12 @@
     // Service instances
     private SongService songService = new SongService();
     private UIHelperService uiHelper = new UIHelperService();
-    private GlobalAudioPlayerService playerService = new GlobalAudioPlayerService();
+
+    // NOTE: No GlobalAudioPlayerService variable needed!
+    // Since it is STATIC, we call it directly:
+    // GlobalAudioPlayerService.PlayNow(song)
+    // GlobalAudioPlayerService.AddToQueue(song)
+    // etc.
 
     // UI state variables
     private List<Song> songList = new List<Song>();
@@ -135,23 +140,34 @@
             await LoadAllSongs();
 
             // Subscribe to player state changes
-            playerService.OnStateChanged += OnPlayerStateChanged;
+            // When the player changes song, pause, etc. this page updates too
+            GlobalAudioPlayerService.OnStateChanged += OnPlayerStateChanged;
+
+            StateHasChanged();
         }
     }
 
     // Called when global player state changes
+    // Uses InvokeAsync to switch back to Blazor's UI thread
+    // This is REQUIRED because the event fires from a different thread
     private void OnPlayerStateChanged()
     {
-        Song? currentSong = playerService.GetCurrentSong();
-        if (currentSong != null)
+        // InvokeAsync switches execution back to Blazor's UI dispatcher thread
+        // Without this, StateHasChanged() crashes because it needs to be
+        // called from the same thread that Blazor uses for rendering
+        InvokeAsync(() =>
         {
-            currentlyPlayingSongId = currentSong.songID;
-        }
-        else
-        {
-            currentlyPlayingSongId = -1;
-        }
-        StateHasChanged();
+            Song? currentSong = GlobalAudioPlayerService.GetCurrentSong();
+            if (currentSong != null)
+            {
+                currentlyPlayingSongId = currentSong.songID;
+            }
+            else
+            {
+                currentlyPlayingSongId = -1;
+            }
+            StateHasChanged();
+        });
     }
 
     // Load current user from session storage
@@ -173,11 +189,8 @@
     {
         songList = await songService.LoadAllSongsAsync();
         allRatings = await songService.LoadAllRatingsForSongsAsync(songList);
-        
-        // Load rating stats for all songs in one SQL query
         ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
 
-        // If user is logged in, also load their personal ratings
         if (currentUser != null)
         {
             userRatings = await songService.LoadUserRatingsAsync(currentUser.userid);
@@ -201,10 +214,7 @@
     {
         songList = await songService.SearchSongsAsync(searchText.Trim());
         allRatings = await songService.LoadAllRatingsForSongsAsync(songList);
-        
-        // Reload rating stats for search results
         ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
-        
         StateHasChanged();
     }
 
@@ -215,10 +225,11 @@
         await LoadAllSongs();
     }
 
-    // Play a song immediately using global player
+    // Play a song immediately using global static player
     private async Task PlayNow(Song song)
     {
-        playerService.PlayNow(song);
+        // Call static method directly - no instance needed!
+        GlobalAudioPlayerService.PlayNow(song);
 
         // Increment play count in background
         await songService.IncrementPlayCountAsync(song.songID);
@@ -227,7 +238,8 @@
     // Add a song to the play queue without playing
     private void AddToQueue(Song song)
     {
-        playerService.AddToQueue(song);
+        // Call static method directly - no instance needed!
+        GlobalAudioPlayerService.AddToQueue(song);
     }
 
     // Get CSS class for song card (highlight if currently playing)
@@ -268,15 +280,12 @@
             return;
         }
 
-        // Save rating using service
         bool success = await songService.SaveRatingAsync(currentUser.userid, songId, value);
 
         if (success)
         {
-            // Update local rating dictionary
             userRatings[songId] = value;
 
-            // Also update allRatings list for average calculation
             bool exists = false;
             for (int i = 0; i < allRatings.Count; i++)
             {
@@ -286,6 +295,7 @@
                     exists = true;
                 }
             }
+
             if (exists == false)
             {
                 allRatings.Add(new Rating
@@ -297,17 +307,14 @@
                 });
             }
 
-            // Reload rating stats from SQL to get updated average and count
             ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
-
             StateHasChanged();
         }
     }
 
-    // Determine which CSS class to apply to stars for LOGGED-IN users
+    // Determine star CSS class for logged-in users
     string GetStarClass(int songId, int starIndex)
     {
-        // First check if we are hovering
         if (previewRatings.ContainsKey(songId))
         {
             int hoverValue = previewRatings[songId];
@@ -321,7 +328,6 @@
             }
         }
 
-        // If not hovering, check the user's actual rating
         if (userRatings.ContainsKey(songId))
         {
             int userValue = userRatings[songId];
@@ -335,14 +341,12 @@
             }
         }
 
-        // No rating at all, show all gray
         return "gray";
     }
 
-    // Determine which CSS class to apply to stars for NON-LOGGED users
+    // Determine star CSS class for non-logged users (shows average)
     string GetStarClassForDisplay(int songId, int starIndex)
     {
-        // Get average rating from stats dictionary (already loaded from SQL)
         double avgRating = 0;
         if (ratingStats.ContainsKey(songId))
         {
@@ -352,7 +356,6 @@
         if (avgRating > 0)
         {
             int roundedAvg = (int)Math.Round(avgRating);
-
             if (starIndex <= roundedAvg)
             {
                 return "filled";

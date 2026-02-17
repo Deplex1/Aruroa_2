@@ -1,212 +1,509 @@
 ﻿@page "/"
-
 @using DBL
-
 @using Models
-
+@using Services
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
-
 @inject NavigationManager Nav
-
 @inject ProtectedSessionStorage Storage
 
-
-
-
-
-
-
-<h1>Welcome to Aurora Music</h1>
-
-
-
-<h3>Popular Songs</h3>
-
-
-
-@if (popularSongs.Count == 0)
-
-{
-
-    <p>No songs found.</p>
-
-}
-
-else
-
-{
-
-    foreach (Song s in popularSongs)
-
-    {
-
-        <div class="song-card">
-
-            <b>@s.title</b><br />
-
-            Duration: @FormatTime(s.duration)<br />
-
-            Plays: @s.plays<br />
-
-            <button @onclick="() => GoSongs()">Open</button>
-
-            <hr />
-
-        </div>
-
-    }
-
-}
-
-
-
-<h3>New Songs</h3>
-
-
-
-@if (newSongs.Count == 0)
-
-{
-
-    <p>No songs found.</p>
-
-}
-
-else
-
-{
-
-    foreach (Song s in newSongs)
-
-    {
-
-        <div class="song-card">
-
-            <b>@s.title</b><br />
-
-            Duration: @FormatTime(s.duration)<br />
-
-            Uploaded: @s.uploaded<br />
-
-            <button @onclick="() => GoSongs()">Open</button>
-
-            <hr />
-
-        </div>
-
-    }
-
-}
-
-
-
-@code
-
-{
-
-    List<Song> popularSongs = new List<Song>();
-
-    List<Song> newSongs = new List<Song>();
-
-
-
-    User user = null;
-
-
-
-    protected override async Task OnAfterRenderAsync(bool first)
-
-    {
-
-        var result = await Storage.GetAsync<User>("user");
-
-        if (result.Success)
-
+@* ===== HERO SECTION ===== *@
+<div class="home-hero">
+    <div class="hero-content">
+        <h1 class="hero-title">Aurora Music</h1>
+        <p class="hero-subtitle">Discover, Upload, and Share Your Favorite Music</p>
+
+        @if (user == null)
         {
+            <div class="hero-buttons">
+                <a href="/login" class="btn btn-primary">Get Started</a>
+                <a href="/songs" class="btn btn-secondary">Browse Songs</a>
+            </div>
+        }
+        else
+        {
+            <div class="hero-buttons">
+                <a href="/upload" class="btn btn-primary">Upload Song</a>
+                <a href="/songs" class="btn btn-secondary">Browse Songs</a>
+            </div>
+        }
+    </div>
+</div>
 
-            user = result.Value;
+@* ===== STATS SECTION ===== *@
+@if (isLoading == false && stats != null)
+{
+    <div class="stats-section">
+        <div class="stat-card">
+            <div class="stat-number">@stats.TotalSongs</div>
+            <div class="stat-label">Songs</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">@stats.TotalUsers</div>
+            <div class="stat-label">Artists</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">@stats.TotalPlaylists</div>
+            <div class="stat-label">Playlists</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">@stats.TotalPlays</div>
+            <div class="stat-label">Total Plays</div>
+        </div>
+    </div>
+}
 
+@* ===== MOST PLAYED SECTION ===== *@
+<div class="home-section">
+    <div class="section-header">
+        <h2>Most Played</h2>
+        <a href="/songs" class="see-all-link">See All →</a>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="skeleton-grid">
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+        </div>
+    }
+    else if (popularSongs.Count == 0)
+    {
+        <div class="empty-state">
+            <p>No songs yet. Be the first to upload!</p>
+            <a href="/upload" class="btn btn-primary">Upload Song</a>
+        </div>
+    }
+    else
+    {
+        <div class="songs-grid">
+            @foreach (Song song in popularSongs)
+            {
+                <div class="home-song-card">
+                    <div class="song-card-info">
+                        <h4 class="song-card-title">@song.title</h4>
+                        <p class="song-card-meta">
+                            @FormatTime(song.duration) • @song.plays plays
+                        </p>
+                    </div>
+                    <div class="song-card-actions">
+                        <button @onclick="() => GoToSongs()" class="btn btn-small btn-primary">
+                            Open
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@* ===== TOP RATED SECTION ===== *@
+<div class="home-section">
+    <div class="section-header">
+        <h2>Top Rated</h2>
+        <a href="/songs" class="see-all-link">See All →</a>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="skeleton-grid">
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+        </div>
+    }
+    else if (topRatedSongs.Count == 0)
+    {
+        <div class="empty-state">
+            <p>No rated songs yet. Start rating songs!</p>
+            <a href="/songs" class="btn btn-secondary">Browse Songs</a>
+        </div>
+    }
+    else
+    {
+        <div class="songs-grid">
+            @foreach (SongWithRating song in topRatedSongs)
+            {
+                <div class="home-song-card">
+                    <div class="song-card-info">
+                        <h4 class="song-card-title">@song.title</h4>
+                        <p class="song-card-meta">
+                            @FormatTime(song.duration) • @song.AvgRating.ToString("0.0") ★ (@song.RatingCount ratings)
+                        </p>
+                    </div>
+                    <div class="song-card-actions">
+                        <button @onclick="() => GoToSongs()" class="btn btn-small btn-primary">
+                            Open
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@* ===== RECENTLY UPLOADED SECTION ===== *@
+<div class="home-section">
+    <div class="section-header">
+        <h2>Recently Uploaded</h2>
+        <a href="/songs" class="see-all-link">See All →</a>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="skeleton-grid">
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+        </div>
+    }
+    else if (newSongs.Count == 0)
+    {
+        <div class="empty-state">
+            <p>No songs uploaded yet!</p>
+        </div>
+    }
+    else
+    {
+        <div class="songs-grid">
+            @foreach (Song song in newSongs)
+            {
+                <div class="home-song-card">
+                    <div class="song-card-info">
+                        <h4 class="song-card-title">@song.title</h4>
+                        <p class="song-card-meta">
+                            @FormatTime(song.duration) • @song.uploaded.ToString("MMM dd, yyyy")
+                        </p>
+                    </div>
+                    <div class="song-card-actions">
+                        <button @onclick="() => GoToSongs()" class="btn btn-small btn-primary">
+                            Open
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    /* ===== HERO SECTION ===== */
+    .home-hero {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 80px 40px;
+        text-align: center;
+        border-radius: 16px;
+        margin-bottom: 40px;
+        color: white;
+    }
+
+    .hero-title {
+        font-size: 48px;
+        font-weight: 700;
+        margin: 0 0 16px 0;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .hero-subtitle {
+        font-size: 20px;
+        margin: 0 0 32px 0;
+        opacity: 0.9;
+    }
+
+    .hero-buttons {
+        display: flex;
+        gap: 16px;
+        justify-content: center;
+    }
+
+    /* ===== STATS SECTION ===== */
+    .stats-section {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-bottom: 40px;
+    }
+
+    .stat-card {
+        background: white;
+        padding: 24px;
+        border-radius: 12px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border: 1px solid #f0f0f0;
+        transition: transform 0.3s;
+    }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.2);
         }
 
+    .stat-number {
+        font-size: 36px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 8px;
+    }
 
+    .stat-label {
+        font-size: 14px;
+        color: #7f8c8d;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
 
-        SongDB db = new SongDB();
+    /* ===== SECTIONS ===== */
+    .home-section {
+        background: white;
+        padding: 30px;
+        border-radius: 16px;
+        margin-bottom: 30px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border: 1px solid #f0f0f0;
+    }
 
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
 
+        .section-header h2 {
+            margin: 0;
+            font-size: 24px;
+            color: #2c3e50;
+            font-weight: 600;
+        }
 
-        popularSongs = await db.GetPopularSongsAsync();
+    .see-all-link {
+        color: #667eea;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        transition: color 0.2s;
+    }
 
-        newSongs = await db.GetNewSongsAsync();
+        .see-all-link:hover {
+            color: #764ba2;
+        }
 
+    /* ===== SONG CARDS ===== */
+    .songs-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+    }
+
+    .home-song-card {
+        background: #f8f9fa;
+        border: 2px solid #e9ecef;
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.3s;
+    }
+
+        .home-song-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        }
+
+    .song-card-title {
+        margin: 0 0 6px 0;
+        font-size: 15px;
+        color: #2c3e50;
+        font-weight: 600;
+    }
+
+    .song-card-meta {
+        margin: 0;
+        font-size: 13px;
+        color: #7f8c8d;
+    }
+
+    /* ===== BUTTONS ===== */
+    .btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.3s;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+    .btn-secondary {
+        background: rgba(255,255,255,0.2);
+        color: white;
+        border: 2px solid rgba(255,255,255,0.5);
+    }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+
+    .btn-small {
+        padding: 8px 16px;
+        font-size: 13px;
+    }
+
+    /* ===== SKELETON LOADING ===== */
+    .skeleton-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+    }
+
+    .skeleton-card {
+        height: 80px;
+        border-radius: 12px;
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s ease-in-out infinite;
+    }
+
+    /*
+            Shimmer animation for skeleton loading cards
+            Moves the gradient from right to left to create a "loading" effect
+            This tells the user that content is being loaded
+        */
+    @@keyframes shimmer {
+        0%
+
+    {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+
+    }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #95a5a6;
+    }
+
+        .empty-state p {
+            margin-bottom: 16px;
+            font-size: 16px;
+        }
+
+    /* ===== RESPONSIVE ===== */
+    @@media (max-width: 768px) {
+        .hero-title
+
+    {
+        font-size: 32px;
+    }
+
+    .stats-section {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .hero-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    }
+</style>
+
+@code {
+    // Service that handles all home page data loading
+    private HomeService homeService = new HomeService();
+
+    // Currently logged-in user (null if not logged in)
+    private User user = null;
+
+    // Loading state - shows skeleton cards while data loads
+    private bool isLoading = true;
+
+    // Data lists for each section
+    private List<Song> popularSongs = new List<Song>();
+    private List<SongWithRating> topRatedSongs = new List<SongWithRating>();
+    private List<Song> newSongs = new List<Song>();
+
+    // Site statistics
+    private SiteStats stats = null;
+
+    // Called after component renders - loads all data
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (first == false)
+        {
+            return;
+        }
+
+        // Show skeleton loading cards while we fetch data
+        isLoading = true;
         StateHasChanged();
 
+        // Check if user is logged in
+        var result = await Storage.GetAsync<User>("user");
+        if (result.Success)
+        {
+            user = result.Value;
+        }
+        else
+        {
+            user = null;
+        }
+
+        // Load all sections using the service
+        popularSongs = await homeService.GetMostPlayedSongsAsync();
+        topRatedSongs = await homeService.GetTopRatedSongsAsync();
+        newSongs = await homeService.GetRecentlyUploadedSongsAsync();
+        stats = await homeService.GetSiteStatsAsync();
+
+        // Done loading - replace skeleton cards with real content
+        isLoading = false;
+        StateHasChanged();
     }
 
-
-
-    void GoLogin()
-
+    // Navigate to songs page
+    private void GoToSongs()
     {
-
-        Nav.NavigateTo("/login");
-
-    }
-
-
-
-    void GoUpload()
-
-    {
-
-        Nav.NavigateTo("/upload");
-
-    }
-
-
-
-    void GoProfile()
-
-    {
-
-        Nav.NavigateTo("/profile");
-
-    }
-
-
-
-    void GoSongs()
-
-    {
-
         Nav.NavigateTo("/songs");
-
     }
 
-
-
-    async Task Logout()
-
+    // Format seconds into MM:SS display
+    // Example: 125 seconds becomes "2:05"
+    private string FormatTime(int seconds)
     {
-
-        await Storage.DeleteAsync("user");
-
-        Nav.NavigateTo("/login", true);
-
-    }
-
-
-
-    string FormatTime(int seconds)
-
-    {
-
         int min = seconds / 60;
-
         int sec = seconds % 60;
-
         return min + ":" + sec.ToString("D2");
-
     }
-
 }
-

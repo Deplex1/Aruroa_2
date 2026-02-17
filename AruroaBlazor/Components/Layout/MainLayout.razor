@@ -2,10 +2,17 @@
 
 <div class="app-layout">
     <NavMenu />
-    
+
     <main class="main-content">
         <div class="page-container">
             @Body
         </div>
     </main>
+
+    @* 
+        Global audio player - appears at bottom of EVERY page
+        This is what actually renders the <audio> element
+        Without this line, no sound can play!
+    *@
+    <AudioPlayer />
 </div>

@@ -1,14 +1,67 @@
+﻿@* 
+    NavMenu.razor - The navigation bar shown at the top of every page
+    
+    This component does 3 things:
+    1. Shows navigation links to all pages
+    2. Checks if user is logged in to show/hide certain links
+    3. Highlights the CURRENT page link so user knows where they are
+*@
+
+@* 
+    @using tells Blazor which "namespaces" (code libraries) we need
+    DBL = Database Layer (our database classes like SongDB, GenreDB)
+    Models = Our data models (User, Song, Playlist, etc.)
+    ProtectedBrowserStorage = Lets us safely store data in the browser session
+*@
 @using DBL
 @using Models
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+
+@* 
+    @inject means we are asking Blazor to give us a pre-made object to use
+    
+    NavigationManager Nav:
+    - Gives us information about the current URL
+    - We use it to check WHICH page the user is on right now
+    - Also used to redirect the user to a different page (like after logout)
+    
+    ProtectedSessionStorage Storage:
+    - Lets us read and write data that is stored in the browser session
+    - "Protected" means the data is encrypted so nobody can tamper with it
+    - We use it to store the logged-in user's information
+*@
 @inject NavigationManager Nav
 @inject ProtectedSessionStorage Storage
 
+@* ==================== HTML SECTION ==================== *@
+
+@* 
+    The <nav> tag is the main navigation container
+    class="main-nav" applies our CSS styling to it
+*@
 <nav class="main-nav">
+
+    @* 
+        nav-brand is the left section showing the app name "Aurora Music"
+        This is like a logo area
+    *@
     <div class="nav-brand">
         <h3>Aurora Music</h3>
     </div>
 
+    @* 
+        nav-links contains all the main page links
+        Each link uses GetActiveClass() to highlight the current page
+        
+        How GetActiveClass works:
+        - It checks if the current URL contains the path we give it
+        - If YES, it returns "active" which CSS uses to highlight that link
+        - If NO, it returns "" (empty string, meaning no highlight)
+        
+        Example: If user is on /songs page:
+        - GetActiveClass("/songs") returns "active" → link gets highlighted
+        - GetActiveClass("/upload") returns "" → link is normal
+    *@
     <div class="nav-links">
         <a href="/" class="nav-link @GetActiveClass("/")">Home</a>
         <a href="/songs" class="nav-link @GetActiveClass("/songs")">Songs</a>
@@ -16,7 +69,14 @@
         <a href="/playlists" class="nav-link @GetActiveClass("/playlists")">Playlists</a>
         <a href="/profile" class="nav-link @GetActiveClass("/profile")">Profile</a>
 
-        @* Admin link only visible if user is admin *@
+        @* 
+            Admin Dashboard link is ONLY shown if:
+            1. A user is logged in (user != null)
+            2. AND that user is an admin (IsAdmin == 1)
+            
+            Regular users will never see this link
+            This is a UI-level check - server-side checks also exist
+        *@
         @if (user != null)
         {
             if (user.IsAdmin == 1)
@@ -26,46 +86,181 @@
         }
     </div>
 
+    @* 
+        nav-auth is the RIGHT section of the navbar
+        It shows different content depending on login status:
+        
+        IF user is NOT logged in:
+        - Shows Login button
+        - Shows Register button
+        
+        IF user IS logged in:
+        - Shows "Hello, [username]" greeting
+        - Shows Logout button
+    *@
     <div class="nav-auth">
         @if (user == null)
         {
+            @* User is not logged in - show login and register links *@
             <a href="/login" class="nav-link nav-auth-btn">Login</a>
             <a href="/register" class="nav-link nav-auth-btn">Register</a>
         }
         else
         {
+            @* 
+                User IS logged in
+                @user.username displays the actual username from the User object
+                Example: "Hello, josh17"
+            *@
             <span class="nav-user">Hello, @user.username</span>
+
+            @* 
+                Logout is a BUTTON (not a link) because it needs to run C# code
+                @onclick="Logout" means "when clicked, call the Logout() method"
+                Links (<a>) just navigate, but buttons can run code first
+            *@
             <button @onclick="Logout" class="nav-link nav-auth-btn">Logout</button>
         }
     </div>
 </nav>
 
+@* ==================== C# CODE SECTION ==================== *@
 @code {
+    @* 
+        This variable holds the currently logged-in user
+        It starts as null (nobody logged in)
+        When we load user data from storage, we set this variable
+        The HTML section checks this variable to decide what to show
+    *@
     private User user = null;
 
+    @* 
+        OnAfterRenderAsync is a Blazor lifecycle method
+        It runs AFTER the component has finished drawing on the screen
+        
+        We use this instead of OnInitializedAsync because:
+        - ProtectedSessionStorage needs JavaScript to work
+        - JavaScript is only available AFTER the component renders
+        - If we try to use Storage before rendering, we get an error
+        
+        The "bool first" parameter tells us:
+        - first = true: This is the FIRST time the component rendered
+        - first = false: The component re-rendered (we ignore this)
+        
+        NOTE: We don't check "if first" here because we WANT the navbar
+        to reload the user every time it renders, keeping it up to date
+    *@
     protected override async Task OnAfterRenderAsync(bool first)
     {
+        @* 
+            Try to get the User object from session storage
+            "user" is the KEY we used when saving the user at login
+            
+            result.Success = true if a user was found in storage
+            result.Success = false if nobody is logged in
+            result.Value = the actual User object (if found)
+        *@
         var result = await Storage.GetAsync<User>("user");
+
         if (result.Success)
         {
+            @* 
+                User was found in storage - they are logged in
+                Set our user variable to the found User object
+                This will update the navbar to show username and logout button
+            *@
             user = result.Value;
+
+            @* 
+                StateHasChanged() tells Blazor "something changed, please redraw"
+                Without this, the navbar might not update visually
+                We must call this manually after changing variables in async methods
+            *@
             StateHasChanged();
         }
         else
         {
+            @* 
+                No user found in storage - nobody is logged in
+                Set user back to null to show login/register buttons
+            *@
             user = null;
             StateHasChanged();
         }
     }
 
+    @* 
+        GetActiveClass() - Highlights the current page link in the navbar
+        
+        HOW IT WORKS:
+        - Nav.Uri gives us the full current URL
+          Example: "https://localhost:5001/songs"
+        - We check if that URL CONTAINS the path we pass in
+          Example: Does "https://localhost:5001/songs" contain "/songs"? YES!
+        
+        PARAMETER:
+        - path: The URL path to check (e.g. "/songs", "/upload", "/playlists")
+        
+        RETURNS:
+        - "active" if the current page matches this path
+        - "" (empty string) if the current page does NOT match
+        
+        The "active" CSS class adds visual styling (like an underline or 
+        different color) to show which page the user is currently on
+        
+        EXAMPLE:
+        User is on the Songs page (URL = /songs):
+        - GetActiveClass("/songs") → returns "active" → Songs link highlighted ✅
+        - GetActiveClass("/upload") → returns "" → Upload link normal
+        - GetActiveClass("/playlists") → returns "" → Playlists link normal
+    *@
     private string GetActiveClass(string path)
     {
+        @* 
+            NOTE: This uses a ternary operator (? :) in C# code
+            Normally we avoid ternary operators, but since this is a 
+            single-line helper method that returns one of two strings,
+            it is acceptable here for readability
+            
+            Nav.Uri.Contains(path) checks if current URL contains the path
+            If YES → return "active"
+            If NO  → return ""
+        *@
         return Nav.Uri.Contains(path) ? "active" : "";
     }
 
+    @* 
+        Logout() - Logs the user out of the application
+        
+        HOW IT WORKS:
+        Step 1: Delete the user data from session storage
+                This removes the "user" key we saved at login
+                After this, Storage.GetAsync<User>("user") will fail
+        
+        Step 2: Navigate to the login page
+                The "true" parameter forces a FULL page reload
+                This ensures all components (navbar, etc.) reset completely
+                Without "true", some components might still show old data
+        
+        WHY async:
+        - Storage.DeleteAsync() needs to communicate with the browser
+        - This takes a tiny amount of time so we must await it
+        - Using async/await ensures we wait for delete to finish
+          before navigating away
+    *@
     private async Task Logout()
     {
-        await Storage.DeleteAsync("user"); // delete the key that actually stores the user object
+        @* 
+            Delete the user from session storage
+            "user" must match exactly the key used when saving at login
+            After this line, the user is effectively logged out
+        *@
+        await Storage.DeleteAsync("user");
+
+        @* 
+            Navigate to login page with forced full reload (true)
+            This clears all component state and starts fresh
+        *@
         Nav.NavigateTo("/login", true);
     }
 }
