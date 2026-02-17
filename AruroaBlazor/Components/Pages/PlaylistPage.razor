@@ -91,7 +91,6 @@ else
         if (user != null)
         {
             await LoadPlaylist();
-            await LoadAllSongs();
             StateHasChanged();
         }
     }
@@ -110,15 +109,8 @@ else
         songs = await playlistService.LoadPlaylistSongsAsync(id);
     }
 
-    // Load all songs using service
-    private async Task LoadAllSongs()
-    {
-        allSongs = await playlistService.LoadAllSongsAsync();
-        FilterSongs();
-    }
-
     // Toggle add songs section
-    private void ToggleAddSongs()
+    private async Task ToggleAddSongs()
     {
         if (ShowAddSongs == true)
         {
@@ -129,13 +121,13 @@ else
             ShowAddSongs = true;
         }
 
-        FilterSongs();
+        await LoadAvailableSongs();
     }
 
-    // Filter songs using service
-    private void FilterSongs()
+    // Load available songs using SQL NOT IN clause
+    private async Task LoadAvailableSongs()
     {
-        filteredSongs = playlistService.FilterAvailableSongs(allSongs, songs);
+        filteredSongs = await playlistService.LoadAvailableSongsAsync(id);
     }
 
     // Add song to playlist using service
@@ -157,7 +149,7 @@ else
             ShowAddSongs = false;
 
             await LoadPlaylist();
-            FilterSongs();
+            await LoadAvailableSongs();
         }
     }
 
@@ -169,7 +161,7 @@ else
         if (success)
         {
             await LoadPlaylist();
-            FilterSongs();
+            await LoadAvailableSongs();
         }
     }
 

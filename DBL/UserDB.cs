@@ -10,8 +10,15 @@ namespace DBL
 {
     public class UserDB : BaseDB<User>
     {
-        protected override string GetTableName() => "users";
-        protected override string GetPrimaryKeyName() => "userid";
+        protected override string GetTableName()
+        {
+            return "users";
+        }
+
+        protected override string GetPrimaryKeyName()
+        {
+            return "userid";
+        }
 
         protected async override Task<User> CreateModelAsync(object[] row)
         {
@@ -132,6 +139,21 @@ namespace DBL
         {
             // Calls the protected SelectAllAsync() from BaseDB
             return await SelectAllAsync();
+        }
+
+        public async Task<User> SelectByIdAsync(int userId)
+        {
+            Dictionary<string, object> parameters = new Dictionary<string, object>();
+            parameters.Add("userid", userId);
+
+            List<User> result = await SelectAllAsync(parameters);
+
+            if (result.Count == 1)
+            {
+                return result[0];
+            }
+
+            return null;
         }
 
         public async Task<int> DeleteUserAsync(int userId)

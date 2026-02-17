@@ -24,7 +24,16 @@ namespace DBL
             r.userid = int.Parse(row[1].ToString());
             r.songid = int.Parse(row[2].ToString());
             r.rating = int.Parse(row[3].ToString());
-            r.daterated = row[4] == null ? null : (System.DateTime?)row[4];
+            
+            if (row[4] == null)
+            {
+                r.daterated = null;
+            }
+            else
+            {
+                r.daterated = (System.DateTime?)row[4];
+            }
+            
             return r;
         }
 
@@ -90,7 +99,14 @@ namespace DBL
             p.Add("s", songId);
 
             var list = await SelectAllAsync(sql, p);
-            return list.Count > 0 ? list[0] : null;
+            if (list.Count > 0)
+            {
+                return list[0];
+            }
+            else
+            {
+                return null;
+            }
         }
 
         /// <summary>
@@ -192,13 +208,60 @@ namespace DBL
                 object[] row = rows[i];
                 
                 int songId = Convert.ToInt32(row[0]);
-                double average = row[1] == DBNull.Value ? 0 : Convert.ToDouble(row[1]);
+                
+                double average = 0;
+                if (row[1] == DBNull.Value)
+                {
+                    average = 0;
+                }
+                else
+                {
+                    average = Convert.ToDouble(row[1]);
+                }
+                
                 int count = Convert.ToInt32(row[2]);
 
                 stats[songId] = (average, count);
             }
 
             return stats;
+        }
+
+        /// <summary>
+        /// Gets all ratings for multiple songs in one SQL query.
+        /// This is MUCH more efficient than calling GetSongRatingsAsync for each song.
+        /// Returns a list of all Rating objects for the specified songs.
+        /// </summary>
+        public async Task<List<Rating>> GetRatingsForMultipleSongsAsync(List<int> songIds)
+        {
+            if (songIds.Count == 0)
+            {
+                return new List<Rating>();
+            }
+
+            // Build SQL with IN clause to get all ratings in one query
+            string sql = "SELECT * FROM ratings WHERE songid IN (";
+
+            // Add placeholders for each song ID
+            Dictionary<string, object> parameters = new Dictionary<string, object>();
+            for (int i = 0; i < songIds.Count; i = i + 1)
+            {
+                string paramName = "s" + i.ToString();
+                sql = sql + "@" + paramName;
+                
+                if (i < songIds.Count - 1)
+                {
+                    sql = sql + ", ";
+                }
+                
+                parameters.Add(paramName, songIds[i]);
+            }
+
+            sql = sql + ") ORDER BY daterated DESC";
+
+            // Execute query
+            List<Rating> ratings = await SelectAllAsync(sql, parameters);
+            return ratings;
         }
     }
 }

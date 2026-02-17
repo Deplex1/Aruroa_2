@@ -191,5 +191,91 @@ namespace DBL
 
             return await DeleteAsync(where);
         }
+
+        /// <summary>
+        /// Gets all songs that are NOT in a specific playlist.
+        /// Uses SQL NOT IN clause to filter in database instead of C#.
+        /// Returns a list of Song objects that can be added to the playlist.
+        /// </summary>
+        public async Task<List<Song>> GetSongsNotInPlaylistAsync(int playlistId)
+        {
+            // Use SQL NOT IN to filter songs in the database
+            // This is MUCH more efficient than loading all songs and filtering in C#
+            string sql = @"SELECT * FROM songs 
+                          WHERE songid NOT IN (
+                              SELECT songid FROM playlist_songs WHERE playlistid = @playlistId
+                          )
+                          ORDER BY title";
+
+            Dictionary<string, object> parameters = new Dictionary<string, object>();
+            parameters.Add("playlistId", playlistId);
+
+            return await SelectAllAsync(sql, parameters);
+        }
+
+        /// <summary>
+        /// Gets user statistics using SQL COUNT and SUM.
+        /// Returns total songs uploaded and total plays across all their songs.
+        /// </summary>
+        public async Task<(int totalSongs, int totalPlays)> GetUserStatsAsync(int userId)
+        {
+            // Get total songs count using SQL COUNT
+            string countSql = "SELECT COUNT(*) FROM songs WHERE userid = @userid";
+            Dictionary<string, object> countParams = new Dictionary<string, object>();
+            countParams.Add("userid", userId);
+            List<object[]> countRows = await ExecuteQueryAsync(countSql, countParams);
+
+            int totalSongs = 0;
+            if (countRows.Count > 0 && countRows[0][0] != null && countRows[0][0] != DBNull.Value)
+            {
+                totalSongs = Convert.ToInt32(countRows[0][0]);
+            }
+
+            // Get total plays using SQL SUM with COALESCE
+            string playsSql = "SELECT COALESCE(SUM(plays), 0) FROM songs WHERE userid = @userid";
+            Dictionary<string, object> playsParams = new Dictionary<string, object>();
+            playsParams.Add("userid", userId);
+            List<object[]> playsRows = await ExecuteQueryAsync(playsSql, playsParams);
+
+            int totalPlays = 0;
+            if (playsRows.Count > 0 && playsRows[0][0] != null && playsRows[0][0] != DBNull.Value)
+            {
+                totalPlays = Convert.ToInt32(playsRows[0][0]);
+            }
+
+            return (totalSongs, totalPlays);
+        }
+
+        /// <summary>
+        /// Filters songs by one or more genres using SQL JOIN and IN clause.
+        /// Returns a list of Song objects that match the selected genres.
+        /// </summary>
+        public async Task<List<Song>> FilterByGenresAsync(List<int> genreIds)
+        {
+            // Build SQL with JOIN and IN clause to filter in database
+            string sql = @"SELECT DISTINCT s.* 
+                          FROM songs s 
+                          INNER JOIN song_genres sg ON s.songid = sg.songid 
+                          WHERE sg.genreid IN (";
+
+            // Add placeholders for each genre ID
+            Dictionary<string, object> parameters = new Dictionary<string, object>();
+            for (int i = 0; i < genreIds.Count; i = i + 1)
+            {
+                string paramName = "g" + i.ToString();
+                sql = sql + "@" + paramName;
+
+                if (i < genreIds.Count - 1)
+                {
+                    sql = sql + ", ";
+                }
+
+                parameters.Add(paramName, genreIds[i]);
+            }
+
+            sql = sql + ") ORDER BY s.title";
+
+            return await SelectAllAsync(sql, parameters);
+        }
     }
 }

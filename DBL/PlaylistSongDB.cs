@@ -47,7 +47,14 @@ namespace DBL
             }
 
             bool exists = await SongExistsInPlaylistAsync(playlistId, songId);
-            return exists ? 1 : 0;
+            if (exists)
+            {
+                return 1;
+            }
+            else
+            {
+                return 0;
+            }
         }
 
         public async Task<int> RemoveSongFromPlaylistAsync(int playlistId, int songId)

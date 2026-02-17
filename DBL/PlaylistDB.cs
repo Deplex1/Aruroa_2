@@ -91,5 +91,18 @@ namespace DBL
 
             return await DeleteAsync(filter);
         }
+
+        /// <summary>
+        /// Gets public playlists for a specific user (only ispublic = 1).
+        /// Returns a list of Playlist objects ordered by created date descending.
+        /// </summary>
+        public async Task<List<Playlist>> GetPublicPlaylistsForUserAsync(int userId)
+        {
+            string sql = "SELECT * FROM playlists WHERE userid = @userid AND ispublic = 1 ORDER BY created DESC";
+            Dictionary<string, object> parameters = new Dictionary<string, object>();
+            parameters.Add("userid", userId);
+
+            return await SelectAllAsync(sql, parameters);
+        }
     }
 }

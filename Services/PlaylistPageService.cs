@@ -55,53 +55,23 @@ namespace Services
         }
 
         /// <summary>
-        /// Loads all songs from the database.
-        /// Returns a list of Song objects.
+        /// Loads all songs that are NOT already in the playlist.
+        /// Uses SQL NOT IN clause to filter in database instead of C#.
+        /// Returns a list of Song objects that can be added.
         /// </summary>
-        public async Task<List<Song>> LoadAllSongsAsync()
+        public async Task<List<Song>> LoadAvailableSongsAsync(int playlistId)
         {
             try
             {
                 SongDB songDB = new SongDB();
-                List<Song> songs = await songDB.SelectAllSongsAsync();
+                List<Song> songs = await songDB.GetSongsNotInPlaylistAsync(playlistId);
                 return songs;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error loading all songs: " + ex.Message);
+                Console.WriteLine("Error loading available songs: " + ex.Message);
                 return new List<Song>();
             }
-        }
-
-        /// <summary>
-        /// Filters songs to show only those not already in the playlist.
-        /// Returns a list of Song objects that can be added.
-        /// </summary>
-        public List<Song> FilterAvailableSongs(List<Song> allSongs, List<Song> playlistSongs)
-        {
-            List<Song> filteredSongs = new List<Song>();
-
-            for (int i = 0; i < allSongs.Count; i = i + 1)
-            {
-                Song candidate = allSongs[i];
-                bool existsInPlaylist = false;
-
-                for (int j = 0; j < playlistSongs.Count; j = j + 1)
-                {
-                    if (playlistSongs[j].songID == candidate.songID)
-                    {
-                        existsInPlaylist = true;
-                        break;
-                    }
-                }
-
-                if (existsInPlaylist == false)
-                {
-                    filteredSongs.Add(candidate);
-                }
-            }
-
-            return filteredSongs;
         }
 
         /// <summary>

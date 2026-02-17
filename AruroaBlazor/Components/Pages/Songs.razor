@@ -2,9 +2,11 @@
 @using Models
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @using Services
+@using DBL
 
 @inject NavigationManager Nav
 @inject ProtectedSessionStorage Storage
+@implements IDisposable
 
 <link href="css/songs.css" rel="stylesheet" />
 
@@ -12,6 +14,28 @@
     <div class="songs-main-section">
         <div class="page-header">
             <h1>Songs</h1>
+        </div>
+
+        @* Genre Filter Section *@
+        <div class="genre-filter-section">
+            <h4>Filter by Genre:</h4>
+            <div class="genre-filter-list">
+                @foreach (Genre genre in availableGenres)
+                {
+                    bool isSelected = IsGenreFilterSelected(genre.genreid);
+                    <div class="genre-filter-item">
+                        <input type="checkbox"
+                               id="filter-@genre.genreid"
+                               checked="@isSelected"
+                               @onchange="(e) => ToggleGenreFilter(genre.genreid, e)" />
+                        <label for="filter-@genre.genreid">@genre.name</label>
+                    </div>
+                }
+            </div>
+            <div class="filter-buttons">
+                <button @onclick="ApplyGenreFilter" class="btn-filter">Apply Filter</button>
+                <button @onclick="ClearGenreFilter" class="btn-filter-clear">Clear Filter</button>
+            </div>
         </div>
 
         <!-- Search Section -->
@@ -48,6 +72,18 @@
 
                 <div class="song-card @GetSongCardClass(song.songID)">
                     <h3>@song.title</h3>
+
+                    @* Show genre badges for this song *@
+                    @if (songGenres.ContainsKey(song.songID))
+                    {
+                        <div class="genre-tags">
+                            @foreach (Genre genre in songGenres[song.songID])
+                            {
+                                <span class="genre-tag">@genre.name</span>
+                            }
+                        </div>
+                    }
+
                     <p class="song-info">Duration: @uiHelper.FormatDuration(song.duration) | Plays: @song.plays | Avg: @uiHelper.FormatRating(avgRating) (@ratingCount ratings)</p>
 
                     @if (song.audioData != null)
@@ -123,6 +159,10 @@
     private List<Song> songList = new List<Song>();
     private List<Rating> allRatings = new List<Rating>();
     private Dictionary<int, (double average, int count)> ratingStats = new Dictionary<int, (double, int)>();
+    private Dictionary<int, List<Genre>> songGenres = new Dictionary<int, List<Genre>>();
+    private List<Genre> availableGenres = new List<Genre>();
+    private List<int> selectedFilterGenreIds = new List<int>();
+    private bool isFilterActive = false;
     private string searchText = "";
     private User? currentUser;
     private Dictionary<int, int> userRatings = new Dictionary<int, int>();
@@ -191,6 +231,17 @@
         allRatings = await songService.LoadAllRatingsForSongsAsync(songList);
         ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
 
+<<<<<<< HEAD
+        // Load genres for all songs in one SQL query
+        songGenres = await songService.LoadSongGenresAsync(songList);
+
+        // Load available genres for filtering
+        GenreDB genreDB = new GenreDB();
+        availableGenres = await genreDB.SelectAllGenresAsync();
+
+        // If user is logged in, also load their personal ratings
+=======
+>>>>>>> 9b37f0cce358bb4eeaa51bde2f4c402055605ea0
         if (currentUser != null)
         {
             userRatings = await songService.LoadUserRatingsAsync(currentUser.userid);
@@ -215,6 +266,13 @@
         songList = await songService.SearchSongsAsync(searchText.Trim());
         allRatings = await songService.LoadAllRatingsForSongsAsync(songList);
         ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
+<<<<<<< HEAD
+
+        // Reload genres for search results
+        songGenres = await songService.LoadSongGenresAsync(songList);
+        
+=======
+>>>>>>> 9b37f0cce358bb4eeaa51bde2f4c402055605ea0
         StateHasChanged();
     }
 
@@ -225,7 +283,80 @@
         await LoadAllSongs();
     }
 
+<<<<<<< HEAD
+    // Check if genre filter checkbox is selected
+    private bool IsGenreFilterSelected(int genreId)
+    {
+        for (int i = 0; i < selectedFilterGenreIds.Count; i = i + 1)
+        {
+            if (selectedFilterGenreIds[i] == genreId)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Toggle genre filter checkbox
+    private void ToggleGenreFilter(int genreId, ChangeEventArgs e)
+    {
+        bool isChecked = false;
+        if (e.Value != null)
+        {
+            isChecked = (bool)e.Value;
+        }
+
+        if (isChecked)
+        {
+            if (IsGenreFilterSelected(genreId) == false)
+            {
+                selectedFilterGenreIds.Add(genreId);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < selectedFilterGenreIds.Count; i = i + 1)
+            {
+                if (selectedFilterGenreIds[i] == genreId)
+                {
+                    selectedFilterGenreIds.RemoveAt(i);
+                    break;
+                }
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    // Apply selected genre filters
+    private async Task ApplyGenreFilter()
+    {
+        if (selectedFilterGenreIds.Count == 0)
+        {
+            await LoadAllSongs();
+            isFilterActive = false;
+            return;
+        }
+
+        isFilterActive = true;
+        songList = await songService.FilterSongsByGenresAsync(selectedFilterGenreIds);
+        ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
+        songGenres = await songService.LoadSongGenresAsync(songList);
+        StateHasChanged();
+    }
+
+    // Clear all genre filters
+    private async Task ClearGenreFilter()
+    {
+        selectedFilterGenreIds.Clear();
+        isFilterActive = false;
+        await LoadAllSongs();
+    }
+
+    // Play a song immediately using global player
+=======
     // Play a song immediately using global static player
+>>>>>>> 9b37f0cce358bb4eeaa51bde2f4c402055605ea0
     private async Task PlayNow(Song song)
     {
         // Call static method directly - no instance needed!
@@ -368,4 +499,14 @@
 
         return "gray";
     }
+<<<<<<< HEAD
+
+    // Cleanup - unsubscribe from events to prevent memory leaks
+    public void Dispose()
+    {
+        playerService.OnStateChanged -= OnPlayerStateChanged;
+    }
 }
+=======
+}
+>>>>>>> 9b37f0cce358bb4eeaa51bde2f4c402055605ea0

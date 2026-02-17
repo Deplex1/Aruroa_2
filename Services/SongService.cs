@@ -47,24 +47,36 @@ namespace Services
 
         /// <summary>
         /// Loads all ratings for all songs in the provided list.
+        /// Uses SQL IN clause to load all ratings in ONE query instead of N queries.
         /// Returns a combined list of all Rating objects.
         /// </summary>
         public async Task<List<Rating>> LoadAllRatingsForSongsAsync(List<Song> songs)
         {
-            RatingDB ratingDB = new RatingDB();
-            List<Rating> allRatings = new List<Rating>();
-
-            // Load all ratings for all songs
-            for (int i = 0; i < songs.Count; i = i + 1)
+            try
             {
-                List<Rating> songRatings = await ratingDB.GetSongRatingsAsync(songs[i].songID);
-                for (int j = 0; j < songRatings.Count; j = j + 1)
+                if (songs.Count == 0)
                 {
-                    allRatings.Add(songRatings[j]);
+                    return new List<Rating>();
                 }
-            }
 
-            return allRatings;
+                // Build list of song IDs
+                List<int> songIds = new List<int>();
+                for (int i = 0; i < songs.Count; i = i + 1)
+                {
+                    songIds.Add(songs[i].songID);
+                }
+
+                // Get all ratings in ONE SQL query using IN clause
+                RatingDB ratingDB = new RatingDB();
+                List<Rating> allRatings = await ratingDB.GetRatingsForMultipleSongsAsync(songIds);
+                
+                return allRatings;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error loading ratings for songs: " + ex.Message);
+                return new List<Rating>();
+            }
         }
 
         /// <summary>
@@ -252,6 +264,74 @@ namespace Services
             }
 
             return queue[index];
+        }
+
+        /// <summary>
+        /// Loads genres for multiple songs in ONE SQL query.
+        /// Returns a dictionary mapping songId to a list of Genre objects.
+        /// This is MUCH more efficient than loading genres for each song individually.
+        /// </summary>
+        public async Task<Dictionary<int, List<Genre>>> LoadSongGenresAsync(List<Song> songs)
+        {
+            Dictionary<int, List<Genre>> songGenres = new Dictionary<int, List<Genre>>();
+
+            if (songs.Count == 0)
+            {
+                return songGenres;
+            }
+
+            // Build list of song IDs
+            List<int> songIds = new List<int>();
+            for (int i = 0; i < songs.Count; i = i + 1)
+            {
+                songIds.Add(songs[i].songID);
+            }
+
+            // Get all genre info in ONE SQL query using JOIN and IN clause
+            SongGenreDB songGenreDB = new SongGenreDB();
+            List<SongGenreInfo> genreInfoList = await songGenreDB.GetGenresForMultipleSongsAsync(songIds);
+
+            // Group results by songId
+            for (int i = 0; i < genreInfoList.Count; i = i + 1)
+            {
+                SongGenreInfo info = genreInfoList[i];
+
+                // Create Genre object from info
+                Genre genre = new Genre();
+                genre.genreid = info.genreid;
+                genre.name = info.name;
+
+                // Add to dictionary
+                if (songGenres.ContainsKey(info.songid))
+                {
+                    songGenres[info.songid].Add(genre);
+                }
+                else
+                {
+                    List<Genre> genreList = new List<Genre>();
+                    genreList.Add(genre);
+                    songGenres[info.songid] = genreList;
+                }
+            }
+
+            return songGenres;
+        }
+
+        /// <summary>
+        /// Filters songs by one or more genres using SQL JOIN and IN clause.
+        /// If genreIds list is empty, returns all songs.
+        /// Returns a list of Song objects that match the selected genres.
+        /// </summary>
+        public async Task<List<Song>> FilterSongsByGenresAsync(List<int> genreIds)
+        {
+            if (genreIds.Count == 0)
+            {
+                return await LoadAllSongsAsync();
+            }
+
+            SongDB songDB = new SongDB();
+            List<Song> songs = await songDB.FilterByGenresAsync(genreIds);
+            return songs;
         }
     }
 }

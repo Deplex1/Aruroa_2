@@ -1,7 +1,9 @@
 ﻿@page "/profile"
+@page "/profile/{ViewUserId:int}"
 @using Models
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @using Services
+@using DBL
 @inject NavigationManager Nav
 @inject ProtectedSessionStorage Storage
 
@@ -16,40 +18,78 @@ else
     <div class="profile-container">
 
         <div class="profile-header">
-            <label class="avatar-wrapper">
+            @if (isViewingOwnProfile)
+            {
+                <label class="avatar-wrapper">
 
-                @if (user.profilepicture != null)
-                {
-                    <img src="@GetProfileImage(user.profilepicture)" class="avatar-img" />
-                }
-                else
-                {
-                    <span class="avatar-placeholder">+</span>
-                }
+                    @if (user.profilepicture != null)
+                    {
+                        <img src="@GetProfileImage(user.profilepicture)" class="avatar-img" />
+                    }
+                    else
+                    {
+                        <span class="avatar-placeholder">+</span>
+                    }
 
-                <InputFile OnChange="OnProfileImageSelected"
-                           accept="image/*"
-                           style="display:none" />
-            </label>
+                    <InputFile OnChange="OnProfileImageSelected"
+                               accept="image/*"
+                               style="display:none" />
+                </label>
+            }
+            else
+            {
+                <div class="avatar-wrapper-readonly">
+                    @if (viewedUser != null && viewedUser.profilepicture != null)
+                    {
+                        <img src="@GetProfileImage(viewedUser.profilepicture)" class="avatar-img" />
+                    }
+                    else
+                    {
+                        <span class="avatar-placeholder">?</span>
+                    }
+                </div>
+            }
 
-            <h3>@user.username</h3>
+            @if (isViewingOwnProfile)
+            {
+                <h3>@user.username</h3>
+            }
+            else if (viewedUser != null)
+            {
+                <h3>@viewedUser.username</h3>
+            }
         </div>
 
-        <div class="profile-info">
-            <p><strong>Email:</strong> @user.email</p>
-
-            <p>
-                <strong>Admin:</strong>
-                @if (user.IsAdmin == 1)
-                {
-                    <span>Yes</span>
-                }
-                else
-                {
-                    <span>No</span>
-                }
-            </p>
+        <!-- User Stats Section (visible to everyone) -->
+        <div class="user-stats">
+            <div class="stat">
+                <span class="stat-number">@totalSongs</span>
+                <span class="stat-label">Songs</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">@totalPlays</span>
+                <span class="stat-label">Total Plays</span>
+            </div>
         </div>
+
+        @if (isViewingOwnProfile)
+        {
+            <div class="profile-info">
+                <p><strong>Email:</strong> @user.email</p>
+
+                <p>
+                    <strong>Admin:</strong>
+                    @if (user.IsAdmin == 1)
+                    {
+                        <span>Yes</span>
+                    }
+                    else
+                    {
+                        <span>No</span>
+                    }
+                </p>
+            </div>
+        }
 
         <div class="profile-section">
             <h2>Uploaded Songs</h2>
@@ -80,9 +120,12 @@ else
                             <p>No audio data available</p>
                         }
 
-                        <button @onclick="() => DeleteSong(song.songID)">
-                            Delete
-                        </button>
+                        @if (isViewingOwnProfile)
+                        {
+                            <button @onclick="() => DeleteSong(song.songID)">
+                                Delete
+                            </button>
+                        }
                     </div>
                 }
             }
@@ -93,7 +136,14 @@ else
 
             @if (UserPlaylists == null || UserPlaylists.Count == 0)
             {
-                <p>No playlists created</p>
+                @if (isViewingOwnProfile)
+                {
+                    <p>No playlists created</p>
+                }
+                else
+                {
+                    <p>No public playlists</p>
+                }
             }
             else
             {
@@ -106,26 +156,39 @@ else
                             </a>
                         </h4>
 
-                        <p>
-                            Status:
-                            @if (playlist.ispublic)
-                            {
-                                <span>Public</span>
-                            }
-                            else
-                            {
-                                <span>Private</span>
-                            }
-                        </p>
+                        @if (isViewingOwnProfile)
+                        {
+                            <p>
+                                Status:
+                                @if (playlist.ispublic)
+                                {
+                                    <span>Public</span>
+                                }
+                                else
+                                {
+                                    <span>Private</span>
+                                }
+                            </p>
+                        }
                     </div>
                 }
             }
         </div>
 
-        <div class="profile-actions">
-            <button @onclick="GoUpload">Upload Song</button>
-            <button @onclick="Logout">Logout</button>
-        </div>
+        @if (isViewingOwnProfile)
+        {
+            <div class="profile-actions">
+                <button @onclick="GoUpload">Upload Song</button>
+                <button @onclick="ViewPublicProfile">View Public Profile</button>
+                <button @onclick="Logout">Logout</button>
+            </div>
+        }
+        else
+        {
+            <div class="profile-actions">
+                <button @onclick="GoBack">Back</button>
+            </div>
+        }
 
     </div>
 }
@@ -134,20 +197,45 @@ else
     // Service instance
     private ProfileService profileService = new ProfileService();
 
+    // Route parameter
+    [Parameter]
+    public int ViewUserId { get; set; }
+
     // UI state variables
     private User? user;
+    private User? viewedUser;
     private List<Song> UserSongs = new List<Song>();
     private List<Playlist> UserPlaylists = new List<Playlist>();
+    private bool isViewingOwnProfile = false;
+    private int totalSongs = 0;
+    private int totalPlays = 0;
 
     // Lifecycle method - loads data on first render
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender == false)
+        {
+            return;
+        }
+
         var result = await Storage.GetAsync<User>("user");
 
         if (result.Success && result.Value != null)
         {
             user = result.Value;
-            await LoadUserData();
+
+            // Check if viewing own profile or someone else's
+            if (ViewUserId == 0 || ViewUserId == user.userid)
+            {
+                isViewingOwnProfile = true;
+                viewedUser = user;
+                await LoadOwnProfile();
+            }
+            else
+            {
+                isViewingOwnProfile = false;
+                await LoadPublicProfile(ViewUserId);
+            }
         }
         else
         {
@@ -159,8 +247,8 @@ else
         StateHasChanged();
     }
 
-    // Load user data using service
-    private async Task LoadUserData()
+    // Load own profile (full access including private playlists)
+    private async Task LoadOwnProfile()
     {
         if (user == null)
         {
@@ -169,6 +257,33 @@ else
 
         UserSongs = await profileService.LoadUserSongsAsync(user.userid);
         UserPlaylists = await profileService.LoadUserPlaylistsAsync(user.userid);
+
+        // Load stats
+        var stats = await profileService.GetUserPublicStatsAsync(user.userid);
+        totalSongs = stats.totalSongs;
+        totalPlays = stats.totalPlays;
+    }
+
+    // Load public profile (only public playlists)
+    private async Task LoadPublicProfile(int userId)
+    {
+        // Load viewed user info
+        UserDB userDB = new UserDB();
+        viewedUser = await userDB.SelectByIdAsync(userId);
+
+        if (viewedUser == null)
+        {
+            return;
+        }
+
+        // Load public data only
+        UserSongs = await profileService.LoadUserSongsAsync(userId);
+        UserPlaylists = await profileService.LoadPublicPlaylistsAsync(userId);
+
+        // Load stats
+        var stats = await profileService.GetUserPublicStatsAsync(userId);
+        totalSongs = stats.totalSongs;
+        totalPlays = stats.totalPlays;
     }
 
     // Delete a song using service
@@ -179,12 +294,23 @@ else
             return;
         }
 
+        if (isViewingOwnProfile == false)
+        {
+            return;
+        }
+
         bool success = await profileService.DeleteSongAsync(songId);
 
         if (success)
         {
             // Remove from local list using service
             profileService.RemoveSongFromList(songId, UserSongs);
+
+            // Reload stats
+            var stats = await profileService.GetUserPublicStatsAsync(user.userid);
+            totalSongs = stats.totalSongs;
+            totalPlays = stats.totalPlays;
+
             StateHasChanged();
         }
     }
@@ -193,6 +319,23 @@ else
     private void GoUpload()
     {
         Nav.NavigateTo("/upload");
+    }
+
+    // View public profile
+    private void ViewPublicProfile()
+    {
+        if (user == null)
+        {
+            return;
+        }
+
+        Nav.NavigateTo("/profile/" + user.userid.ToString());
+    }
+
+    // Go back to previous page
+    private void GoBack()
+    {
+        Nav.NavigateTo("/songs");
     }
 
     // Logout user
@@ -206,6 +349,11 @@ else
     private async Task OnProfileImageSelected(InputFileChangeEventArgs e)
     {
         if (user == null)
+        {
+            return;
+        }
+
+        if (isViewingOwnProfile == false)
         {
             return;
         }

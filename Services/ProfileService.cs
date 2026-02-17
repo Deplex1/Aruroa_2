@@ -162,5 +162,43 @@ namespace Services
 
             return "data:image/png;base64," + Convert.ToBase64String(imageData);
         }
+
+        /// <summary>
+        /// Gets public playlists for a user (only ispublic = 1).
+        /// Returns a list of Playlist objects that are marked as public.
+        /// </summary>
+        public async Task<List<Playlist>> LoadPublicPlaylistsAsync(int userId)
+        {
+            try
+            {
+                PlaylistDB playlistDB = new PlaylistDB();
+                List<Playlist> playlists = await playlistDB.GetPublicPlaylistsForUserAsync(userId);
+                return playlists;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error loading public playlists: " + ex.Message);
+                return new List<Playlist>();
+            }
+        }
+
+        /// <summary>
+        /// Gets public stats for a user using SQL COUNT and SUM.
+        /// Returns total songs uploaded and total plays across all their songs.
+        /// </summary>
+        public async Task<(int totalSongs, int totalPlays)> GetUserPublicStatsAsync(int userId)
+        {
+            try
+            {
+                SongDB songDB = new SongDB();
+                var stats = await songDB.GetUserStatsAsync(userId);
+                return stats;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error getting user public stats: " + ex.Message);
+                return (0, 0);
+            }
+        }
     }
 }
