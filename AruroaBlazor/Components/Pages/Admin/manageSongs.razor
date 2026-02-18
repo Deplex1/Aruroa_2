@@ -1,0 +1,140 @@
+﻿@page "/adminDashboard/manageSongs"
+
+@using Models
+@using Services
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject ProtectedSessionStorage Storage
+@inject NavigationManager Nav
+
+
+@if (user == null)
+{
+    <p>You must be logged in as an admin to view this page.</p>
+}
+else if (user.IsAdmin == 0)
+{
+    <p>You do not have permission to view this page.</p>
+}
+else
+{
+    <div class="admin-page">
+        <h2>Songs Administration</h2>
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="message">@message</div>
+        }
+
+        <table class="songs-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Duration</th>
+                    <th>Plays</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (int i = 0; i < songs.Count; i++)
+                {
+                    int index = i;
+
+                    <tr>
+                        <td>@songs[index].songID</td>
+                        <td>@songs[index].title</td>
+                        <td>@songs[index].duration sec</td>
+                        <td>@songs[index].plays</td>
+                        <td>
+                            <button @onclick="() => PlaySong(index)">Play</button>
+                            <button @onclick="() => DeleteSong(index)">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+
+    private SongAdminService songService = new SongAdminService();
+
+    private User user = null;
+    private List<Song> songs = new List<Song>();
+    private string message = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender == false)
+        {
+            return;
+        }
+
+        var result = await Storage.GetAsync<User>("user");
+        if (result.Success)
+        {
+            user = result.Value;
+
+            if (user.IsAdmin == 1)
+            {
+                await LoadSongs();
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task LoadSongs()
+    {
+        songs = await songService.LoadAllSongsAsync();
+
+        if (songs.Count == 0)
+        {
+            message = "No songs found.";
+        }
+    }
+
+    private void PlaySong(int index)
+    {
+        Song selectedSong = songs[index];
+
+        string error = songService.ValidateSong(selectedSong);
+        if (error != null)
+        {
+            message = error;
+            return;
+        }
+
+        // Send song to global queue and start playing
+        GlobalAudioPlayerService.ClearQueue();
+        GlobalAudioPlayerService.AddToQueue(selectedSong);
+        GlobalAudioPlayerService.PlayFromQueue(0);
+
+        message = "Playing: " + selectedSong.title;
+    }
+
+    private async Task DeleteSong(int index)
+    {
+        Song selectedSong = songs[index];
+
+        string error = songService.ValidateSong(selectedSong);
+        if (error != null)
+        {
+            message = error;
+            return;
+        }
+
+        bool success = await songService.DeleteSongAsync(selectedSong.songID);
+
+        if (success)
+        {
+            message = "Song deleted.";
+            await LoadSongs();
+        }
+        else
+        {
+            message = "Error deleting song.";
+        }
+    }
+}

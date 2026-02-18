@@ -16,7 +16,6 @@
             <h1>Songs</h1>
         </div>
 
-        @* Genre Filter Section *@
         <div class="genre-filter-section">
             <h4>Filter by Genre:</h4>
             <div class="genre-filter-list">
@@ -38,7 +37,6 @@
             </div>
         </div>
 
-        <!-- Search Section -->
         <div class="search-section">
             <input placeholder="Search songs..." @bind="searchText" @oninput="OnSearchInput" />
             <button @onclick="Search">Search</button>
@@ -61,7 +59,6 @@
             {
                 Song song = songList[i];
 
-                // Get rating stats from dictionary (already loaded from SQL)
                 double avgRating = 0;
                 int ratingCount = 0;
                 if (ratingStats.ContainsKey(song.songID))
@@ -73,7 +70,6 @@
                 <div class="song-card @GetSongCardClass(song.songID)">
                     <h3>@song.title</h3>
 
-                    @* Show genre badges for this song *@
                     @if (songGenres.ContainsKey(song.songID))
                     {
                         <div class="genre-tags">
@@ -84,57 +80,32 @@
                         </div>
                     }
 
-                    <p class="song-info">Duration: @uiHelper.FormatDuration(song.duration) | Plays: @song.plays | Avg: @uiHelper.FormatRating(avgRating) (@ratingCount ratings)</p>
+                    <p class="song-info">
+                        Duration: @uiHelper.FormatDuration(song.duration) |
+                        Plays: @song.plays |
+                        Avg: @uiHelper.FormatRating(avgRating) (@ratingCount ratings)
+                    </p>
 
                     @if (song.audioData != null)
                     {
                         <div class="action-buttons">
-                            <button class="play-now-btn" @onclick="() => PlayNow(song)">
-                                ▶ Play Now
-                            </button>
-                            <button class="add-to-queue-btn" @onclick="() => AddToQueue(song)">
-                                + Add to Queue
-                            </button>
+                            <button class="play-now-btn" @onclick="() => PlayNow(song)">▶ Play Now</button>
+                            <button class="add-to-queue-btn" @onclick="() => AddToQueue(song)">+ Add to Queue</button>
                         </div>
                     }
 
-                    <!-- Star rating -->
-                    <div class="stars-section">
-                        <div class="stars">
-                            @if (currentUser == null)
-                            {
-                                @for (int s = 1; s <= 5; s++)
-                                {
-                                    int currentStar = s;
-                                    string starClass = GetStarClassForDisplay(song.songID, currentStar);
-
-                                    <span class="star @starClass disabled">
-                                        ★
-                                    </span>
-                                }
-                            }
-                            else
-                            {
-                                @for (int s = 1; s <= 5; s++)
-                                {
-                                    int currentStar = s;
-                                    string starClass = GetStarClass(song.songID, currentStar);
-
-                                    <span class="star @starClass"
-                                          @onmouseover="() => OnHover(song.songID, currentStar)"
-                                          @onmouseout="() => OnHover(song.songID, 0)"
-                                          @onclick="() => OnClick(song.songID, currentStar)">
-                                        ★
-                                    </span>
-                                }
-                            }
-                        </div>
-
-                        @if (currentUser == null)
+                    <div class="stars">
+                        @for (int s = 1; s <= 5; s++)
                         {
-                            <div class="login-notice">
-                                Please <a @onclick="GoToLogin">log in</a> to rate songs
-                            </div>
+                            int currentStar = s;
+                            string starClass = GetStarClass(song.songID, currentStar);
+
+                            <span class="star @starClass"
+                                  @onmouseover="() => OnHover(song.songID, currentStar)"
+                                  @onmouseout="() => OnHover(song.songID, 0)"
+                                  @onclick="() => OnClick(song.songID, currentStar)">
+                                ★
+                            </span>
                         }
                     </div>
                 </div>
@@ -145,33 +116,23 @@
 
 @code
 {
-    // Service instances
     private SongService songService = new SongService();
     private UIHelperService uiHelper = new UIHelperService();
 
-    // NOTE: No GlobalAudioPlayerService variable needed!
-    // Since it is STATIC, we call it directly:
-    // GlobalAudioPlayerService.PlayNow(song)
-    // GlobalAudioPlayerService.AddToQueue(song)
-    // etc.
-
-    // UI state variables
     private List<Song> songList = new List<Song>();
-    private List<Rating> allRatings = new List<Rating>();
-    private Dictionary<int, (double average, int count)> ratingStats = new Dictionary<int, (double, int)>();
-    private Dictionary<int, List<Genre>> songGenres = new Dictionary<int, List<Genre>>();
-    private List<Genre> availableGenres = new List<Genre>();
-    private List<int> selectedFilterGenreIds = new List<int>();
-    private bool isFilterActive = false;
+    private Dictionary<int, (double average, int count)> ratingStats = new();
+    private Dictionary<int, List<Genre>> songGenres = new();
+    private List<Genre> availableGenres = new();
+    private List<int> selectedFilterGenreIds = new();
+
     private string searchText = "";
     private User? currentUser;
-    private Dictionary<int, int> userRatings = new Dictionary<int, int>();
-    private Dictionary<int, int> previewRatings = new Dictionary<int, int>();
 
-    // Currently playing song ID (from global player)
+    private Dictionary<int, int> userRatings = new();
+    private Dictionary<int, int> previewRatings = new();
+
     private int currentlyPlayingSongId = -1;
 
-    // Lifecycle method - loads data on first render
     protected override async Task OnAfterRenderAsync(bool first)
     {
         if (first)
@@ -179,112 +140,141 @@
             await LoadCurrentUser();
             await LoadAllSongs();
 
-            // Subscribe to player state changes
-            // When the player changes song, pause, etc. this page updates too
             GlobalAudioPlayerService.OnStateChanged += OnPlayerStateChanged;
-
             StateHasChanged();
         }
     }
 
-    // Called when global player state changes
-    // Uses InvokeAsync to switch back to Blazor's UI thread
-    // This is REQUIRED because the event fires from a different thread
     private void OnPlayerStateChanged()
     {
-        // InvokeAsync switches execution back to Blazor's UI dispatcher thread
-        // Without this, StateHasChanged() crashes because it needs to be
-        // called from the same thread that Blazor uses for rendering
         InvokeAsync(() =>
         {
             Song? currentSong = GlobalAudioPlayerService.GetCurrentSong();
-            if (currentSong != null)
-            {
-                currentlyPlayingSongId = currentSong.songID;
-            }
-            else
-            {
-                currentlyPlayingSongId = -1;
-            }
+            currentlyPlayingSongId = currentSong != null ? currentSong.songID : -1;
             StateHasChanged();
         });
     }
 
-    // Load current user from session storage
     private async Task LoadCurrentUser()
     {
         var result = await Storage.GetAsync<User>("user");
-        if (result.Success)
-        {
-            currentUser = result.Value;
-        }
-        else
-        {
-            currentUser = null;
-        }
+        currentUser = result.Success ? result.Value : null;
     }
 
-    // Load all songs from database using service
     private async Task LoadAllSongs()
     {
         songList = await songService.LoadAllSongsAsync();
-        allRatings = await songService.LoadAllRatingsForSongsAsync(songList);
         ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
-
-<<<<<<< HEAD
-        // Load genres for all songs in one SQL query
         songGenres = await songService.LoadSongGenresAsync(songList);
 
-        // Load available genres for filtering
         GenreDB genreDB = new GenreDB();
         availableGenres = await genreDB.SelectAllGenresAsync();
 
-        // If user is logged in, also load their personal ratings
-=======
->>>>>>> 9b37f0cce358bb4eeaa51bde2f4c402055605ea0
         if (currentUser != null)
         {
             userRatings = await songService.LoadUserRatingsAsync(currentUser.userid);
         }
+    }
 
-        StateHasChanged();
+    private async Task Search()
+    {
+        songList = await songService.SearchSongsAsync(searchText.Trim());
+        ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
+        songGenres = await songService.LoadSongGenresAsync(songList);
+    }
+
+    private async Task OnClick(int songId, int value)
+    {
+        if (currentUser == null) return;
+
+        bool success = await songService.SaveRatingAsync(currentUser.userid, songId, value);
+
+        if (success)
+        {
+            userRatings[songId] = value;
+            ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
+            StateHasChanged();
+        }
+    }
+
+    private void OnHover(int songId, int value)
+    {
+        if (value > 0)
+        {
+            previewRatings[songId] = value;
+        }
+        else
+        {
+            previewRatings.Remove(songId);
+        }
+    }
+
+    string GetStarClass(int songId, int starIndex)
+    {
+        if (previewRatings.ContainsKey(songId))
+        {
+            return starIndex <= previewRatings[songId] ? "filled" : "gray";
+        }
+
+        if (userRatings.ContainsKey(songId))
+        {
+            return starIndex <= userRatings[songId] ? "filled" : "gray";
+        }
+
+        return "gray";
+    }
+
+    private async Task PlayNow(Song song)
+    {
+        GlobalAudioPlayerService.PlayNow(song);
+        await songService.IncrementPlayCountAsync(song.songID);
+    }
+
+    private void AddToQueue(Song song)
+    {
+        GlobalAudioPlayerService.AddToQueue(song);
+    }
+
+    private string GetSongCardClass(int songId)
+    {
+        return songId == currentlyPlayingSongId ? "currently-playing" : "";
+    }
+
+    public void Dispose()
+    {
+        GlobalAudioPlayerService.OnStateChanged -= OnPlayerStateChanged;
     }
 
     // Called when user types in the search box
     private async Task OnSearchInput(ChangeEventArgs e)
     {
-        searchText = e.Value?.ToString() ?? "";
+        if (e.Value != null)
+        {
+            searchText = e.Value.ToString();
+        }
+        else
+        {
+            searchText = "";
+        }
+
+        // If user cleared the search box we reload everything
         if (string.IsNullOrWhiteSpace(searchText))
         {
             await LoadAllSongs();
+            StateHasChanged();
         }
     }
 
-    // Search for songs using service
-    private async Task Search()
-    {
-        songList = await songService.SearchSongsAsync(searchText.Trim());
-        allRatings = await songService.LoadAllRatingsForSongsAsync(songList);
-        ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
-<<<<<<< HEAD
 
-        // Reload genres for search results
-        songGenres = await songService.LoadSongGenresAsync(songList);
-        
-=======
->>>>>>> 9b37f0cce358bb4eeaa51bde2f4c402055605ea0
-        StateHasChanged();
-    }
-
-    // Clear search and show all songs again
+    // Clear search button
     private async Task ClearSearch()
     {
         searchText = "";
         await LoadAllSongs();
+        StateHasChanged();
     }
 
-<<<<<<< HEAD
-    // Check if genre filter checkbox is selected
+    // Check if a genre checkbox is selected
     private bool IsGenreFilterSelected(int genreId)
     {
         for (int i = 0; i < selectedFilterGenreIds.Count; i = i + 1)
@@ -294,19 +284,21 @@
                 return true;
             }
         }
+
         return false;
     }
 
-    // Toggle genre filter checkbox
+    // When user clicks a genre checkbox
     private void ToggleGenreFilter(int genreId, ChangeEventArgs e)
     {
         bool isChecked = false;
+
         if (e.Value != null)
         {
             isChecked = (bool)e.Value;
         }
 
-        if (isChecked)
+        if (isChecked == true)
         {
             if (IsGenreFilterSelected(genreId) == false)
             {
@@ -328,185 +320,27 @@
         StateHasChanged();
     }
 
-    // Apply selected genre filters
+    // Apply genre filter button
     private async Task ApplyGenreFilter()
     {
         if (selectedFilterGenreIds.Count == 0)
         {
             await LoadAllSongs();
-            isFilterActive = false;
             return;
         }
 
-        isFilterActive = true;
         songList = await songService.FilterSongsByGenresAsync(selectedFilterGenreIds);
         ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
         songGenres = await songService.LoadSongGenresAsync(songList);
+
         StateHasChanged();
     }
 
-    // Clear all genre filters
+    // Clear genre filters button
     private async Task ClearGenreFilter()
     {
         selectedFilterGenreIds.Clear();
-        isFilterActive = false;
         await LoadAllSongs();
-    }
-
-    // Play a song immediately using global player
-=======
-    // Play a song immediately using global static player
->>>>>>> 9b37f0cce358bb4eeaa51bde2f4c402055605ea0
-    private async Task PlayNow(Song song)
-    {
-        // Call static method directly - no instance needed!
-        GlobalAudioPlayerService.PlayNow(song);
-
-        // Increment play count in background
-        await songService.IncrementPlayCountAsync(song.songID);
-    }
-
-    // Add a song to the play queue without playing
-    private void AddToQueue(Song song)
-    {
-        // Call static method directly - no instance needed!
-        GlobalAudioPlayerService.AddToQueue(song);
-    }
-
-    // Get CSS class for song card (highlight if currently playing)
-    private string GetSongCardClass(int songId)
-    {
-        if (songId == currentlyPlayingSongId)
-        {
-            return "currently-playing";
-        }
-        return "";
-    }
-
-    // Navigate to login page
-    private void GoToLogin()
-    {
-        Nav.NavigateTo("/login");
-    }
-
-    // Called when mouse hovers over a star
-    void OnHover(int songId, int value)
-    {
-        if (value > 0)
-        {
-            previewRatings[songId] = value;
-        }
-        else
-        {
-            previewRatings.Remove(songId);
-        }
         StateHasChanged();
     }
-
-    // Called when user clicks a star to rate a song
-    private async Task OnClick(int songId, int value)
-    {
-        if (currentUser == null)
-        {
-            return;
-        }
-
-        bool success = await songService.SaveRatingAsync(currentUser.userid, songId, value);
-
-        if (success)
-        {
-            userRatings[songId] = value;
-
-            bool exists = false;
-            for (int i = 0; i < allRatings.Count; i++)
-            {
-                if (allRatings[i].songid == songId && allRatings[i].userid == currentUser.userid)
-                {
-                    allRatings[i].rating = value;
-                    exists = true;
-                }
-            }
-
-            if (exists == false)
-            {
-                allRatings.Add(new Rating
-                {
-                    songid = songId,
-                    userid = currentUser.userid,
-                    rating = value,
-                    daterated = System.DateTime.Now
-                });
-            }
-
-            ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
-            StateHasChanged();
-        }
-    }
-
-    // Determine star CSS class for logged-in users
-    string GetStarClass(int songId, int starIndex)
-    {
-        if (previewRatings.ContainsKey(songId))
-        {
-            int hoverValue = previewRatings[songId];
-            if (starIndex <= hoverValue)
-            {
-                return "filled";
-            }
-            else
-            {
-                return "gray";
-            }
-        }
-
-        if (userRatings.ContainsKey(songId))
-        {
-            int userValue = userRatings[songId];
-            if (starIndex <= userValue)
-            {
-                return "filled";
-            }
-            else
-            {
-                return "gray";
-            }
-        }
-
-        return "gray";
-    }
-
-    // Determine star CSS class for non-logged users (shows average)
-    string GetStarClassForDisplay(int songId, int starIndex)
-    {
-        double avgRating = 0;
-        if (ratingStats.ContainsKey(songId))
-        {
-            avgRating = ratingStats[songId].average;
-        }
-
-        if (avgRating > 0)
-        {
-            int roundedAvg = (int)Math.Round(avgRating);
-            if (starIndex <= roundedAvg)
-            {
-                return "filled";
-            }
-            else
-            {
-                return "gray";
-            }
-        }
-
-        return "gray";
-    }
-<<<<<<< HEAD
-
-    // Cleanup - unsubscribe from events to prevent memory leaks
-    public void Dispose()
-    {
-        playerService.OnStateChanged -= OnPlayerStateChanged;
-    }
 }
-=======
-}
->>>>>>> 9b37f0cce358bb4eeaa51bde2f4c402055605ea0
