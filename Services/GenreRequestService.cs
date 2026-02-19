@@ -10,6 +10,31 @@ namespace Services
     // Keeps the Razor page clean with only UI logic
     public class GenreRequestService
     {
+
+
+        // Create a new genre request from a user
+        // Returns true if request was saved successfully
+        public async Task<bool> CreateRequestAsync(int userId, string genreName)
+        {
+            // Basic validation (business logic belongs here, not in Razor)
+            if (userId <= 0)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(genreName))
+            {
+                return false;
+            }
+
+            GenreRequestDB requestDB = new GenreRequestDB();
+
+            return (1 == await requestDB.AddRequestAsync(userId, genreName));
+
+            
+        }
+
+
         // Get all pending genre requests for admin to review
         // Returns newest requests first (SQL handles sorting)
         public async Task<List<GenreRequest>> GetPendingRequestsAsync()

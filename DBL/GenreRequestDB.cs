@@ -1,7 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using Google.Protobuf.WellKnownTypes;
 using Models;
+using MySql.Data.MySqlClient;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Threading.Tasks;
 
 namespace DBL
 {
@@ -91,6 +94,10 @@ namespace DBL
             return requests;
         }
 
+
+        
+
+
         // Get all requests submitted by a specific user
         // Uses SQL ORDER BY to return newest first
         public async Task<List<GenreRequest>> GetUserRequestsAsync(int userId)
@@ -178,6 +185,10 @@ namespace DBL
             return rowsAffected > 0;
         }
 
+
+
+
+
         // Reject a genre request
         // Returns true if successful, false if failed
         public async Task<bool> RejectRequestAsync(int requestId, int adminUserId)
@@ -245,5 +256,7 @@ namespace DBL
 
             return count;
         }
+
+        
     }
 }

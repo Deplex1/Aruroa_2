@@ -37,6 +37,20 @@ else
                         <label for="genre-@currentGenre.genreid">@currentGenre.name</label>
                     </div>
                 }
+                <div class="request-genre-box">
+                    <label>Can't find your genre?</label>
+                    <input placeholder="Request new genre..." @bind="requestedGenreName" />
+                    <button class="btn btn-secondary" @onclick="RequestGenre" disabled="@isRequesting">
+                        @if (isRequesting)
+                        {
+                            <span>Sending...</span>
+                        }
+                        else
+                        {
+                            <span>Request Genre</span>
+                        }
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -106,6 +120,14 @@ else
     private bool isUploading = false;
     private List<int> selectedGenreIds = new List<int>();
     private List<Genre> availableGenres = new List<Genre>();
+    private string requestedGenreName = "";
+    private bool isRequesting = false;
+
+    // Use the service (just like admin page does)
+    private GenreRequestService genreRequestService = new GenreRequestService();
+
+
+
 
     // Lifecycle method - loads data on first render
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -242,4 +264,27 @@ else
         isUploading = false;
         StateHasChanged();
     }
+
+    private async Task RequestGenre()
+    {
+        if (user == null)
+        {
+            message = "Login required.";
+            return;
+        }
+
+        bool success = await genreRequestService.CreateRequestAsync(user.userid, requestedGenreName);
+
+        if (success)
+        {
+            message = "Request sent for admin approval.";
+            requestedGenreName = "";
+        }
+        else
+        {
+            message = "Failed to send request.";
+        }
+    }
+    
+
 }
