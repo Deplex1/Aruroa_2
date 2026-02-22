@@ -1,0 +1,6 @@
+@AruroaAPI_HostAddress = http://localhost:5230
+
+GET {{AruroaAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

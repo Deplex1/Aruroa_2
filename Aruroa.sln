@@ -20,6 +20,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "saveHereDB", "saveHereDB", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Services", "Services\Services.csproj", "{79D9757E-9A99-4CA8-BA4C-9A4AC3B1A49F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AruroaAPI", "AruroaAPI\AruroaAPI.csproj", "{B1387EF9-A17B-4CE1-8C77-4B897020E7B5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -50,6 +52,10 @@ Global
 		{79D9757E-9A99-4CA8-BA4C-9A4AC3B1A49F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{79D9757E-9A99-4CA8-BA4C-9A4AC3B1A49F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{79D9757E-9A99-4CA8-BA4C-9A4AC3B1A49F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1387EF9-A17B-4CE1-8C77-4B897020E7B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1387EF9-A17B-4CE1-8C77-4B897020E7B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1387EF9-A17B-4CE1-8C77-4B897020E7B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1387EF9-A17B-4CE1-8C77-4B897020E7B5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

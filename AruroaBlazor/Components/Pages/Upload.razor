@@ -84,26 +84,152 @@ else
 }
 
 <style>
+    /* ---- Upload Page Layout ---- */
+    .upload-form {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem;
+        background-color: #111827;
+        border-radius: 14px;
+        border: 1px solid #374151;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.45);
+        animation: fadeIn 0.3s ease;
+    }
+
+    h1 {
+        text-align: center;
+        margin-bottom: 2rem;
+        letter-spacing: 1px;
+    }
+
+    /* ---- Inputs ---- */
+    .upload-form input[type="text"],
+    .upload-form input:not([type]) {
+        background-color: #020617;
+        border: 2px solid #1f2937;
+        transition: all 0.2s ease;
+    }
+
+    .upload-form input:focus {
+        border-color: #3b82f6;
+        background-color: #020617;
+    }
+
+    /* ---- Genre Selection ---- */
     .genre-checkboxes {
         display: flex;
         flex-wrap: wrap;
-        gap: 15px;
-        margin-top: 10px;
+        gap: 10px;
+        margin-top: 12px;
+        padding: 12px;
+        background-color: #020617;
+        border-radius: 10px;
+        border: 1px solid #1f2937;
     }
 
-    .genre-checkbox-item {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-    }
-
+    /* Hide ugly checkbox */
     .genre-checkbox-item input[type="checkbox"] {
-        cursor: pointer;
+        display: none;
     }
 
+    /* Make label look like a selectable chip */
     .genre-checkbox-item label {
+        padding: 8px 14px;
+        border-radius: 999px;
+        background-color: #1f2937;
+        border: 1px solid #374151;
+        color: #cbd5e1;
         cursor: pointer;
-        user-select: none;
+        font-size: 13px;
+        transition: all 0.18s ease;
+    }
+
+        /* Hover */
+        .genre-checkbox-item label:hover {
+            border-color: #3b82f6;
+            color: #3b82f6;
+            transform: translateY(-1px);
+        }
+
+    /* Checked state */
+    .genre-checkbox-item input[type="checkbox"]:checked + label {
+        background-color: #3b82f6;
+        border-color: #3b82f6;
+        color: white;
+        box-shadow: 0 4px 12px rgba(59,130,246,0.35);
+    }
+
+    /* ---- Request Genre Box ---- */
+    .request-genre-box {
+        width: 100%;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #1f2937;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+
+        .request-genre-box input {
+            flex: 1;
+            min-width: 180px;
+        }
+
+    /* ---- File Picker ---- */
+    input[type="file"] {
+        background-color: #020617;
+        border: 2px dashed #374151;
+        padding: 20px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+        input[type="file"]:hover {
+            border-color: #3b82f6;
+        }
+
+    .file-info {
+        margin-top: 8px;
+        color: #9ca3af;
+        font-size: 13px;
+    }
+
+    /* ---- Buttons ---- */
+    .btn {
+        margin-top: 10px;
+        font-size: 15px;
+        letter-spacing: 0.3px;
+    }
+
+    button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    /* ---- Message ---- */
+    .message {
+        margin-top: 18px;
+        animation: fadeIn 0.25s ease;
+    }
+
+    /* ---- Animation ---- */
+    @@keyframes fadeIn {
+        from
+
+    {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
     }
 </style>
 
