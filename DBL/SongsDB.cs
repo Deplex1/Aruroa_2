@@ -63,7 +63,15 @@ namespace DBL
             s.songID = int.Parse(row[0].ToString());
             s.title = row[1].ToString();
             s.duration = int.Parse(row[2].ToString());
-            s.audioData = (byte[])row[3];
+            try
+            {
+                s.audioData = (byte[])row[3];
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"{e.Message}");
+                s.audioData = null;
+            }
             s.userid = int.Parse(row[4].ToString());
 
             if (row[5] != null)
