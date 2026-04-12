@@ -10,6 +10,11 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.13" />
     <PackageReference Include="MySql.Data" Version="9.5.0" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.12.46" />
+    <PackageReference Include="Blazorise.Charts" Version="1.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="apiTest\" />
   </ItemGroup>
 
 </Project>
