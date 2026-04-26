@@ -1,7 +1,10 @@
 ﻿@using Models
 @using Services
+@using DBL
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @implements IDisposable
 @inject IJSRuntime JS
+@inject ProtectedSessionStorage Storage
 
 @* 
     AudioPlayer.razor - Global audio player shown at bottom of ALL pages
@@ -104,9 +107,46 @@
                                 activeClass = "queue-item-active";
                             }
 
-                            <div class="queue-item @activeClass" @onclick="() => PlayFromQueue(index)">
-                                <span class="queue-item-number">@(index + 1)</span>
-                                <span class="queue-item-title">@queueSong.title</span>
+                            <div class="queue-item @activeClass">
+                                <span class="queue-item-number" @onclick="() => PlayFromQueue(index)">@(index + 1)</span>
+                                <span class="queue-item-title" @onclick="() => PlayFromQueue(index)">@queueSong.title</span>
+                                
+                                @* Add to Playlist button *@
+                                @if (currentUser != null)
+                                {
+                                    <button class="queue-item-add-playlist"
+                                            @onclick="() => TogglePlaylistDropdown(index)"
+                                            @onclick:stopPropagation="true"
+                                            title="Add to Playlist">
+                                        +
+                                    </button>
+
+                                    @* Playlist dropdown *@
+                                    @if (showPlaylistDropdown == index)
+                                    {
+                                        <div class="playlist-dropdown">
+                                            @if (userPlaylists.Count == 0)
+                                            {
+                                                <div class="playlist-dropdown-empty">No playlists yet</div>
+                                            }
+                                            else
+                                            {
+                                                @for (int p = 0; p < userPlaylists.Count; p = p + 1)
+                                                {
+                                                    int playlistIndex = p;
+                                                    Playlist playlist = userPlaylists[playlistIndex];
+                                                    
+                                                    <button class="playlist-dropdown-item"
+                                                            @onclick="() => AddSongToPlaylist(queueSong.songID, playlist.playlistid)"
+                                                            @onclick:stopPropagation="true">
+                                                        @playlist.name
+                                                    </button>
+                                                }
+                                            }
+                                        </div>
+                                    }
+                                }
+
                                 <button class="queue-item-remove"
                                         @onclick="() => RemoveFromQueue(index)"
                                         @onclick:stopPropagation="true">
@@ -159,10 +199,10 @@
         gap: 10px;
         padding: 6px 10px;
         border-radius: 6px;
-        cursor: pointer;
         transition: background 0.2s;
         font-size: 13px;
         color: rgba(255,255,255,0.8);
+        position: relative;
     }
 
         .queue-item:hover {
@@ -179,6 +219,7 @@
         min-width: 20px;
         font-size: 11px;
         opacity: 0.7;
+        cursor: pointer;
     }
 
     .queue-item-title {
@@ -186,7 +227,25 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        cursor: pointer;
     }
+
+    .queue-item-add-playlist {
+        background: rgba(56, 239, 125, 0.3);
+        border: 1px solid rgba(56, 239, 125, 0.5);
+        color: white;
+        cursor: pointer;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: bold;
+        transition: all 0.2s;
+    }
+
+        .queue-item-add-playlist:hover {
+            background: rgba(56, 239, 125, 0.5);
+            border-color: rgba(56, 239, 125, 0.8);
+        }
 
     .queue-item-remove {
         background: none;
@@ -203,6 +262,59 @@
             background: rgba(255,0,0,0.3);
             color: white;
         }
+
+    /* Playlist Dropdown */
+    .playlist-dropdown {
+        position: absolute;
+        bottom: 100%;
+        right: 0;
+        background: linear-gradient(135deg, #2d3250 0%, #1a1d2e 100%);
+        border: 2px solid rgba(102, 126, 234, 0.5);
+        border-radius: 8px;
+        padding: 8px;
+        min-width: 180px;
+        max-width: 250px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 10000;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        margin-bottom: 5px;
+    }
+
+    .playlist-dropdown-item {
+        display: block;
+        width: 100%;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        padding: 8px 12px;
+        margin-bottom: 4px;
+        border-radius: 6px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+        .playlist-dropdown-item:hover {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: transparent;
+            transform: translateX(2px);
+        }
+
+        .playlist-dropdown-item:last-child {
+            margin-bottom: 0;
+        }
+
+    .playlist-dropdown-empty {
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 12px;
+        padding: 8px;
+        text-align: center;
+    }
 
     /* Fixed player at bottom of screen */
     .global-audio-player {
@@ -426,10 +538,117 @@
     // We use this to tell JavaScript which element to control
     private const string AudioElementId = "global-audio-player";
 
+    // Playlist functionality
+    private User? currentUser = null;
+    private List<Playlist> userPlaylists = new List<Playlist>();
+    private int showPlaylistDropdown = -1; // -1 means no dropdown shown, otherwise index of queue item
+
     // Called when component first initializes
     protected override void OnInitialized()
     {
         GlobalAudioPlayerService.OnStateChanged += OnPlayerStateChanged;
+    }
+
+    // Called after component initializes - async version
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadCurrentUser();
+            if (currentUser != null)
+            {
+                await LoadUserPlaylists();
+                StateHasChanged();
+            }
+        }
+    }
+
+    // Load current user from session storage
+    private async Task LoadCurrentUser()
+    {
+        var result = await Storage.GetAsync<User>("user");
+        currentUser = result.Success ? result.Value : null;
+    }
+
+    // Load user's playlists
+    private async Task LoadUserPlaylists()
+    {
+        if (currentUser == null)
+        {
+            return;
+        }
+
+        try
+        {
+            PlaylistService playlistService = new PlaylistService();
+            userPlaylists = await playlistService.LoadUserPlaylistsAsync(currentUser.userid);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error loading playlists: " + ex.Message);
+            userPlaylists = new List<Playlist>();
+        }
+    }
+
+    // Toggle playlist dropdown for a queue item
+    private void TogglePlaylistDropdown(int queueIndex)
+    {
+        if (showPlaylistDropdown == queueIndex)
+        {
+            // Close if already open
+            showPlaylistDropdown = -1;
+        }
+        else
+        {
+            // Open for this queue item
+            showPlaylistDropdown = queueIndex;
+        }
+
+        StateHasChanged();
+    }
+
+    // Add song to playlist
+    private async Task AddSongToPlaylist(int songId, int playlistId)
+    {
+        try
+        {
+            PlaylistSongDB playlistSongDB = new PlaylistSongDB();
+            
+            // Check if song is already in playlist
+            bool alreadyExists = await playlistSongDB.SongExistsInPlaylistAsync(playlistId, songId);
+            
+            if (alreadyExists)
+            {
+                Console.WriteLine("Song already in playlist");
+                showPlaylistDropdown = -1;
+                StateHasChanged();
+                return;
+            }
+
+            // Get the next position (max position + 1)
+            int maxPosition = await playlistSongDB.GetMaxPositionInPlaylistAsync(playlistId);
+            int newPosition = maxPosition + 1;
+
+            // Add song to playlist
+            int result = await playlistSongDB.AddSongToPlaylistAsync(playlistId, songId, newPosition);
+            
+            if (result > 0)
+            {
+                Console.WriteLine("Song added to playlist successfully");
+            }
+            else
+            {
+                Console.WriteLine("Failed to add song to playlist");
+            }
+
+            // Close dropdown
+            showPlaylistDropdown = -1;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error adding song to playlist: " + ex.Message);
+        }
     }
 
     // Play a specific song from the queue

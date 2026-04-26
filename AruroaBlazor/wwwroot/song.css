@@ -450,6 +450,7 @@
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     transition: all 0.3s;
     border: 1px solid #f0f0f0;
+    position: relative;
 }
 
     .song-card:hover {
@@ -463,6 +464,78 @@
         font-size: 22px;
         font-weight: 600;
     }
+
+.song-title-contextmenu {
+    cursor: context-menu;
+    user-select: none;
+}
+
+    .song-title-contextmenu:hover {
+        color: #667eea;
+    }
+
+/* Context Menu */
+.context-menu {
+    position: fixed;
+    background: linear-gradient(135deg, #2d3250 0%, #1a1d2e 100%);
+    border: 2px solid rgba(102, 126, 234, 0.5);
+    border-radius: 8px;
+    padding: 8px;
+    min-width: 200px;
+    max-width: 300px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 10000;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.context-menu-header {
+    color: #a8b3ff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(102, 126, 234, 0.3);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.context-menu-item {
+    display: block;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 10px 14px;
+    margin-bottom: 4px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+    .context-menu-item:hover {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-color: transparent;
+        transform: translateX(4px);
+        box-shadow: 0 0 15px rgba(102, 126, 234, 0.5);
+    }
+
+    .context-menu-item:last-child {
+        margin-bottom: 0;
+    }
+
+.context-menu-item-disabled {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 13px;
+    padding: 10px 14px;
+    text-align: center;
+    font-style: italic;
+}
 
 .song-info {
     color: #7f8c8d;

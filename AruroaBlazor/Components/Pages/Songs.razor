@@ -8,9 +8,9 @@
 @inject ProtectedSessionStorage Storage
 @implements IDisposable
 
-<link href="~/song.css?v=2" rel="stylesheet" />
+<link href="~/song.css?v=3" rel="stylesheet" />
 
-<div class="songs-page-wrapper">
+<div class="songs-page-wrapper" @onclick="HideContextMenu">
     <div class="songs-main-section">
         <div class="page-header">
             <h1>Songs</h1>
@@ -92,7 +92,11 @@
                 }
 
                 <div class="song-card @GetSongCardClass(song.songID)">
-                    <h3>@song.title</h3>
+                    <h3 @oncontextmenu="(e) => ShowContextMenu(e, song.songID)" 
+                        @oncontextmenu:preventDefault="true"
+                        class="song-title-contextmenu">
+                        @song.title
+                    </h3>
 
                     @if (songGenres.ContainsKey(song.songID))
                     {
@@ -115,6 +119,37 @@
                         <div class="action-buttons">
                             <button class="play-now-btn" @onclick="() => PlayNow(song)">▶ Play Now</button>
                             <button class="add-to-queue-btn" @onclick="() => AddToQueue(song)">+ Add to Queue</button>
+                        </div>
+                    }
+
+                    @* Context Menu for Add to Playlist *@
+                    @if (contextMenuVisible && contextMenuSongId == song.songID)
+                    {
+                        <div class="context-menu" 
+                             style="top: @(contextMenuY)px; left: @(contextMenuX)px;"
+                             @onclick:stopPropagation="true">
+                            <div class="context-menu-header">Add to Playlist</div>
+                            
+                            @if (currentUser == null)
+                            {
+                                <div class="context-menu-item-disabled">Please login first</div>
+                            }
+                            else if (availablePlaylistsForSong.Count == 0)
+                            {
+                                <div class="context-menu-item-disabled">No available playlists</div>
+                            }
+                            else
+                            {
+                                @for (int p = 0; p < availablePlaylistsForSong.Count; p = p + 1)
+                                {
+                                    Playlist playlist = availablePlaylistsForSong[p];
+                                    
+                                    <button class="context-menu-item"
+                                            @onclick="() => AddSongToPlaylistFromContext(song.songID, playlist.playlistid)">
+                                        @playlist.name
+                                    </button>
+                                }
+                            }
                         </div>
                     }
 
@@ -159,6 +194,14 @@
 
     private int currentlyPlayingSongId = -1;
 
+    // Context menu for add to playlist
+    private bool contextMenuVisible = false;
+    private int contextMenuSongId = -1;
+    private double contextMenuX = 0;
+    private double contextMenuY = 0;
+    private List<Playlist> userPlaylists = new List<Playlist>();
+    private List<Playlist> availablePlaylistsForSong = new List<Playlist>();
+
     protected override async Task OnAfterRenderAsync(bool first)
     {
         if (first)
@@ -200,6 +243,107 @@
         if (currentUser != null)
         {
             userRatings = await songService.LoadUserRatingsAsync(currentUser.userid);
+            await LoadUserPlaylists();
+        }
+    }
+
+    // Load user's playlists
+    private async Task LoadUserPlaylists()
+    {
+        if (currentUser == null)
+        {
+            return;
+        }
+
+        try
+        {
+            PlaylistService playlistService = new PlaylistService();
+            userPlaylists = await playlistService.LoadUserPlaylistsAsync(currentUser.userid);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error loading playlists: " + ex.Message);
+            userPlaylists = new List<Playlist>();
+        }
+    }
+
+    // Show context menu on right-click
+    private async Task ShowContextMenu(MouseEventArgs e, int songId)
+    {
+        contextMenuVisible = true;
+        contextMenuSongId = songId;
+        contextMenuX = e.ClientX;
+        contextMenuY = e.ClientY;
+
+        // Filter playlists to only show ones that don't already have this song
+        await FilterAvailablePlaylists(songId);
+
+        StateHasChanged();
+    }
+
+    // Hide context menu
+    private void HideContextMenu()
+    {
+        contextMenuVisible = false;
+        contextMenuSongId = -1;
+        StateHasChanged();
+    }
+
+    // Filter playlists to only show ones that don't have this song
+    private async Task FilterAvailablePlaylists(int songId)
+    {
+        availablePlaylistsForSong = new List<Playlist>();
+
+        if (currentUser == null)
+        {
+            return;
+        }
+
+        PlaylistSongDB playlistSongDB = new PlaylistSongDB();
+
+        for (int i = 0; i < userPlaylists.Count; i = i + 1)
+        {
+            Playlist playlist = userPlaylists[i];
+            
+            // Check if song already exists in this playlist
+            bool exists = await playlistSongDB.SongExistsInPlaylistAsync(playlist.playlistid, songId);
+            
+            if (exists == false)
+            {
+                availablePlaylistsForSong.Add(playlist);
+            }
+        }
+    }
+
+    // Add song to playlist from context menu
+    private async Task AddSongToPlaylistFromContext(int songId, int playlistId)
+    {
+        try
+        {
+            PlaylistSongDB playlistSongDB = new PlaylistSongDB();
+
+            // Get the next position (max position + 1)
+            int maxPosition = await playlistSongDB.GetMaxPositionInPlaylistAsync(playlistId);
+            int newPosition = maxPosition + 1;
+
+            // Add song to playlist
+            int result = await playlistSongDB.AddSongToPlaylistAsync(playlistId, songId, newPosition);
+
+            if (result > 0)
+            {
+                Console.WriteLine("Song added to playlist successfully");
+            }
+            else
+            {
+                Console.WriteLine("Failed to add song to playlist");
+            }
+
+            // Hide context menu
+            HideContextMenu();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error adding song to playlist: " + ex.Message);
         }
     }
 
