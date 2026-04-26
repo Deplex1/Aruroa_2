@@ -8,7 +8,7 @@
 @inject ProtectedSessionStorage Storage
 @implements IDisposable
 
-@* <link href="~/song.css" rel="stylesheet" /> *@
+<link href="~/song.css" rel="stylesheet" />
 
 <div class="songs-page-wrapper">
     <div class="songs-main-section">
@@ -16,31 +16,55 @@
             <h1>Songs</h1>
         </div>
 
-        <div class="genre-filter-section">
-            <h4>Filter by Genre:</h4>
-            <div class="genre-filter-list">
-                @foreach (Genre genre in availableGenres)
-                {
-                    bool isSelected = IsGenreFilterSelected(genre.genreid);
-                    <div class="genre-filter-item">
-                        <input type="checkbox"
-                               id="filter-@genre.genreid"
-                               checked="@isSelected"
-                               @onchange="(e) => ToggleGenreFilter(genre.genreid, e)" />
-                        <label for="filter-@genre.genreid">@genre.name</label>
-                    </div>
-                }
-            </div>
-            <div class="filter-buttons">
-                <button @onclick="ApplyGenreFilter" class="btn-filter">Apply Filter</button>
-                <button @onclick="ClearGenreFilter" class="btn-filter-clear">Clear Filter</button>
-            </div>
+        <div class="search-section">
+            <input placeholder="Search songs..." @bind="searchText" @oninput="OnSearchInput" class="search-input" />
+            <button @onclick="Search" class="btn-search">Search</button>
+            <button @onclick="ClearSearch" class="btn-clear">Clear</button>
         </div>
 
-        <div class="search-section">
-            <input placeholder="Search songs..." @bind="searchText" @oninput="OnSearchInput" />
-            <button @onclick="Search">Search</button>
-            <button @onclick="ClearSearch">Clear</button>
+        <div class="genre-filter-section">
+            <h4>Filter by Genre:</h4>
+            
+            @* Search bar for filtering genre names *@
+            <div class="genre-search-bar">
+                <input type="text" 
+                       placeholder="Search genres..." 
+                       @bind="genreSearchText" 
+                       @oninput="OnGenreSearchInput" 
+                       class="genre-search-input" />
+            </div>
+
+            @* Active filters display *@
+            @if (selectedFilterGenreIds.Count > 0)
+            {
+                <div class="active-filters">
+                    <span class="active-filters-label">Active Filters:</span>
+                    @for (int i = 0; i < selectedFilterGenreIds.Count; i = i + 1)
+                    {
+                        int genreId = selectedFilterGenreIds[i];
+                        string genreName = GetGenreNameById(genreId);
+                        
+                        <span class="filter-tag active" @onclick="() => RemoveGenreFilter(genreId)">
+                            @genreName ✕
+                        </span>
+                    }
+                    <button @onclick="ClearGenreFilter" class="btn-clear-all">Clear All</button>
+                </div>
+            }
+
+            @* Available genres as clickable tags *@
+            <div class="genre-tags-container">
+                @for (int i = 0; i < filteredGenres.Count; i = i + 1)
+                {
+                    Genre genre = filteredGenres[i];
+                    bool isSelected = IsGenreFilterSelected(genre.genreid);
+                    string tagClass = isSelected ? "filter-tag selected" : "filter-tag";
+                    
+                    <span class="@tagClass" @onclick="() => ToggleGenreFilterClick(genre.genreid)">
+                        @genre.name
+                    </span>
+                }
+            </div>
         </div>
 
         <hr class="divider" />
@@ -123,9 +147,11 @@
     private Dictionary<int, (double average, int count)> ratingStats = new();
     private Dictionary<int, List<Genre>> songGenres = new();
     private List<Genre> availableGenres = new();
+    private List<Genre> filteredGenres = new();
     private List<int> selectedFilterGenreIds = new();
 
     private string searchText = "";
+    private string genreSearchText = "";
     private User? currentUser;
 
     private Dictionary<int, int> userRatings = new();
@@ -169,6 +195,7 @@
 
         GenreDB genreDB = new GenreDB();
         availableGenres = await genreDB.SelectAllGenresAsync();
+        filteredGenres = availableGenres;
 
         if (currentUser != null)
         {
@@ -274,7 +301,7 @@
         StateHasChanged();
     }
 
-    // Check if a genre checkbox is selected
+    // Check if a genre is selected in the filter
     private bool IsGenreFilterSelected(int genreId)
     {
         for (int i = 0; i < selectedFilterGenreIds.Count; i = i + 1)
@@ -288,25 +315,14 @@
         return false;
     }
 
-    // When user clicks a genre checkbox
-    private void ToggleGenreFilter(int genreId, ChangeEventArgs e)
+    // When user clicks on a genre tag to toggle it
+    private async Task ToggleGenreFilterClick(int genreId)
     {
-        bool isChecked = false;
+        bool isSelected = IsGenreFilterSelected(genreId);
 
-        if (e.Value != null)
+        if (isSelected == true)
         {
-            isChecked = (bool)e.Value;
-        }
-
-        if (isChecked == true)
-        {
-            if (IsGenreFilterSelected(genreId) == false)
-            {
-                selectedFilterGenreIds.Add(genreId);
-            }
-        }
-        else
-        {
+            // Remove from filter
             for (int i = 0; i < selectedFilterGenreIds.Count; i = i + 1)
             {
                 if (selectedFilterGenreIds[i] == genreId)
@@ -316,11 +332,81 @@
                 }
             }
         }
+        else
+        {
+            // Add to filter
+            selectedFilterGenreIds.Add(genreId);
+        }
+
+        // Apply filter immediately when clicking
+        await ApplyGenreFilter();
+    }
+
+    // Remove a specific genre from active filters
+    private async Task RemoveGenreFilter(int genreId)
+    {
+        for (int i = 0; i < selectedFilterGenreIds.Count; i = i + 1)
+        {
+            if (selectedFilterGenreIds[i] == genreId)
+            {
+                selectedFilterGenreIds.RemoveAt(i);
+                break;
+            }
+        }
+
+        await ApplyGenreFilter();
+    }
+
+    // Get genre name by ID for display
+    private string GetGenreNameById(int genreId)
+    {
+        for (int i = 0; i < availableGenres.Count; i = i + 1)
+        {
+            if (availableGenres[i].genreid == genreId)
+            {
+                return availableGenres[i].name;
+            }
+        }
+
+        return "";
+    }
+
+    // Filter genres based on search text
+    private void OnGenreSearchInput(ChangeEventArgs e)
+    {
+        if (e.Value != null)
+        {
+            genreSearchText = e.Value.ToString();
+        }
+        else
+        {
+            genreSearchText = "";
+        }
+
+        // Filter the available genres list
+        if (string.IsNullOrWhiteSpace(genreSearchText))
+        {
+            filteredGenres = availableGenres;
+        }
+        else
+        {
+            filteredGenres = new List<Genre>();
+            string searchLower = genreSearchText.ToLower();
+
+            for (int i = 0; i < availableGenres.Count; i = i + 1)
+            {
+                string genreNameLower = availableGenres[i].name.ToLower();
+                if (genreNameLower.Contains(searchLower))
+                {
+                    filteredGenres.Add(availableGenres[i]);
+                }
+            }
+        }
 
         StateHasChanged();
     }
 
-    // Apply genre filter button
+    // Apply genre filter - uses SQL to filter songs
     private async Task ApplyGenreFilter()
     {
         if (selectedFilterGenreIds.Count == 0)
@@ -329,6 +415,7 @@
             return;
         }
 
+        // Use SQL-FIRST approach - filter in database
         songList = await songService.FilterSongsByGenresAsync(selectedFilterGenreIds);
         ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
         songGenres = await songService.LoadSongGenresAsync(songList);
@@ -336,7 +423,7 @@
         StateHasChanged();
     }
 
-    // Clear genre filters button
+    // Clear all genre filters
     private async Task ClearGenreFilter()
     {
         selectedFilterGenreIds.Clear();
