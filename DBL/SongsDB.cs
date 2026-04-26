@@ -255,13 +255,15 @@ namespace DBL
         }
 
         /// <summary>
-        /// Filters songs by one or more genres using SQL JOIN and IN clause.
-        /// Returns a list of Song objects that match the selected genres.
+        /// Filters songs by one or more genres using SQL JOIN and GROUP BY with HAVING.
+        /// Uses AND logic - returns only songs that have ALL selected genres.
+        /// Returns a list of Song objects that match ALL the selected genres.
         /// </summary>
         public async Task<List<Song>> FilterByGenresAsync(List<int> genreIds)
         {
-            // Build SQL with JOIN and IN clause to filter in database
-            string sql = @"SELECT DISTINCT s.* 
+            // Build SQL with JOIN, GROUP BY, and HAVING to ensure ALL genres match
+            // The HAVING COUNT ensures the song has ALL selected genres, not just ANY
+            string sql = @"SELECT s.* 
                           FROM songs s 
                           INNER JOIN song_genres sg ON s.songid = sg.songid 
                           WHERE sg.genreid IN (";
@@ -281,7 +283,13 @@ namespace DBL
                 parameters.Add(paramName, genreIds[i]);
             }
 
-            sql = sql + ") ORDER BY s.title";
+            // GROUP BY and HAVING COUNT ensures song has ALL selected genres
+            // COUNT(DISTINCT sg.genreid) = number of selected genres means the song has all of them
+            sql = sql + ") GROUP BY s.songid, s.title, s.duration, s.audioData, s.userid, s.uploaded, s.plays ";
+            sql = sql + "HAVING COUNT(DISTINCT sg.genreid) = @genreCount ";
+            sql = sql + "ORDER BY s.title";
+
+            parameters.Add("genreCount", genreIds.Count);
 
             return await SelectAllAsync(sql, parameters);
         }

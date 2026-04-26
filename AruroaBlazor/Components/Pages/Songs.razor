@@ -8,7 +8,7 @@
 @inject ProtectedSessionStorage Storage
 @implements IDisposable
 
-<link href="~/song.css" rel="stylesheet" />
+<link href="~/song.css?v=2" rel="stylesheet" />
 
 <div class="songs-page-wrapper">
     <div class="songs-main-section">
@@ -44,9 +44,9 @@
                         int genreId = selectedFilterGenreIds[i];
                         string genreName = GetGenreNameById(genreId);
                         
-                        <span class="filter-tag active" @onclick="() => RemoveGenreFilter(genreId)">
+                        <button class="filter-tag active" @onclick="() => RemoveGenreFilter(genreId)">
                             @genreName ✕
-                        </span>
+                        </button>
                     }
                     <button @onclick="ClearGenreFilter" class="btn-clear-all">Clear All</button>
                 </div>
@@ -60,9 +60,9 @@
                     bool isSelected = IsGenreFilterSelected(genre.genreid);
                     string tagClass = isSelected ? "filter-tag selected" : "filter-tag";
                     
-                    <span class="@tagClass" @onclick="() => ToggleGenreFilterClick(genre.genreid)">
+                    <button class="@tagClass" @onclick="() => ToggleGenreFilterClick(genre.genreid)">
                         @genre.name
-                    </span>
+                    </button>
                 }
             </div>
         </div>
@@ -205,9 +205,8 @@
 
     private async Task Search()
     {
-        songList = await songService.SearchSongsAsync(searchText.Trim());
-        ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
-        songGenres = await songService.LoadSongGenresAsync(songList);
+        // Apply both search text AND genre filters together
+        await ApplyFilters();
     }
 
     private async Task OnClick(int songId, int value)
@@ -284,10 +283,10 @@
             searchText = "";
         }
 
-        // If user cleared the search box we reload everything
+        // If user cleared the search box, reapply filters
         if (string.IsNullOrWhiteSpace(searchText))
         {
-            await LoadAllSongs();
+            await ApplyFilters();
             StateHasChanged();
         }
     }
@@ -297,7 +296,7 @@
     private async Task ClearSearch()
     {
         searchText = "";
-        await LoadAllSongs();
+        await ApplyFilters();
         StateHasChanged();
     }
 
@@ -409,25 +408,61 @@
     // Apply genre filter - uses SQL to filter songs
     private async Task ApplyGenreFilter()
     {
-        if (selectedFilterGenreIds.Count == 0)
-        {
-            await LoadAllSongs();
-            return;
-        }
-
-        // Use SQL-FIRST approach - filter in database
-        songList = await songService.FilterSongsByGenresAsync(selectedFilterGenreIds);
-        ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
-        songGenres = await songService.LoadSongGenresAsync(songList);
-
-        StateHasChanged();
+        // Apply both search text AND genre filters together
+        await ApplyFilters();
     }
 
     // Clear all genre filters
     private async Task ClearGenreFilter()
     {
         selectedFilterGenreIds.Clear();
-        await LoadAllSongs();
+        await ApplyFilters();
+        StateHasChanged();
+    }
+
+    // Combined method that applies BOTH search text AND genre filters
+    // This ensures AND logic - songs must match search text AND have all selected genres
+    private async Task ApplyFilters()
+    {
+        // Start with all songs or filtered by genres
+        if (selectedFilterGenreIds.Count == 0)
+        {
+            // No genre filter - just search
+            if (string.IsNullOrWhiteSpace(searchText))
+            {
+                songList = await songService.LoadAllSongsAsync();
+            }
+            else
+            {
+                songList = await songService.SearchSongsAsync(searchText.Trim());
+            }
+        }
+        else
+        {
+            // Apply genre filter first (with AND logic)
+            songList = await songService.FilterSongsByGenresAsync(selectedFilterGenreIds);
+
+            // Then filter by search text in C# if search text exists
+            if (string.IsNullOrWhiteSpace(searchText) == false)
+            {
+                List<Song> searchFiltered = new List<Song>();
+                string searchLower = searchText.Trim().ToLower();
+
+                for (int i = 0; i < songList.Count; i = i + 1)
+                {
+                    string titleLower = songList[i].title.ToLower();
+                    if (titleLower.Contains(searchLower))
+                    {
+                        searchFiltered.Add(songList[i]);
+                    }
+                }
+
+                songList = searchFiltered;
+            }
+        }
+
+        ratingStats = await songService.GetRatingStatsForSongsAsync(songList);
+        songGenres = await songService.LoadSongGenresAsync(songList);
         StateHasChanged();
     }
 }
