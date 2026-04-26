@@ -1,0 +1,60 @@
+graph TB
+    Guest[אורח]
+    User[משתמש רגיל]
+    Admin[מנהל]
+    
+    UC1[UC1: צפייה בשירים]
+    UC2[UC2: חיפוש שירים]
+    UC3[UC3: הרשמה]
+    UC4[UC4: התחברות]
+    UC5[UC5: העלאת שיר]
+    UC6[UC6: השמעת שיר]
+    UC7[UC7: דירוג שיר]
+    UC8[UC8: יצירת פלייליסט]
+    UC9[UC9: ניהול פלייליסט]
+    UC10[UC10: השמעת פלייליסט]
+    UC11[UC11: ניהול פרופיל]
+    UC12[UC12: מחיקת שיר שלי]
+    UC13[UC13: בקשה לז'אנר]
+    UC14[UC14: פלייליסטים ציבוריים]
+    UC15[UC15: לוח בקרה]
+    UC16[UC16: ניהול משתמשים]
+    UC17[UC17: ניהול שירים]
+    UC18[UC18: ניהול ז'אנרים]
+    UC19[UC19: ניהול בקשות ז'אנרים]
+    
+    Guest --> UC1
+    Guest --> UC2
+    Guest --> UC3
+    Guest --> UC4
+    
+    User --> UC1
+    User --> UC2
+    User --> UC5
+    User --> UC6
+    User --> UC7
+    User --> UC8
+    User --> UC9
+    User --> UC10
+    User --> UC11
+    User --> UC12
+    User --> UC13
+    User --> UC14
+    
+    Admin --> UC1
+    Admin --> UC2
+    Admin --> UC5
+    Admin --> UC6
+    Admin --> UC7
+    Admin --> UC8
+    Admin --> UC9
+    Admin --> UC10
+    Admin --> UC11
+    Admin --> UC12
+    Admin --> UC13
+    Admin --> UC14
+    Admin --> UC15
+    Admin --> UC16
+    Admin --> UC17
+    Admin --> UC18
+    Admin --> UC19
