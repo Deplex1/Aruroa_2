@@ -1,4 +1,5 @@
 using AruroaBlazor.Components;
+using DBL;
 
 namespace AruroaBlazor
 {
@@ -12,6 +13,12 @@ namespace AruroaBlazor
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
 
+            // Load connection string from appsettings.json and set it in DB class
+            var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+            if (string.IsNullOrEmpty(connectionString) == false)
+            {
+                DB.SetConnectionString(connectionString);
+            }
 
             var app = builder.Build();
 

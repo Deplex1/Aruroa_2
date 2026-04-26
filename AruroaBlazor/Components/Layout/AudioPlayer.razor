@@ -18,15 +18,23 @@
     It is added to MainLayout.razor so it appears on every page
 *@
 
-@if (currentSong != null)
+@if (currentSong != null || GlobalAudioPlayerService.GetPlayQueue().Count > 0)
 {
     <div class="global-audio-player">
         <div class="player-container">
 
             @* ===== SONG INFO SECTION ===== *@
             <div class="song-info-section">
-                <div class="song-title">@currentSong.title</div>
-                <div class="song-duration">@FormatTime(currentTime) / @FormatTime(duration)</div>
+                @if (currentSong != null)
+                {
+                    <div class="song-title">@currentSong.title</div>
+                    <div class="song-duration">@FormatTime(currentTime) / @FormatTime(duration)</div>
+                }
+                else
+                {
+                    <div class="song-title">Queue Ready</div>
+                    <div class="song-duration">Click a song to play</div>
+                }
             </div>
 
             @* ===== CONTROLS SECTION ===== *@
@@ -810,6 +818,13 @@
     // Play/pause button clicked
     private async Task TogglePlayPause()
     {
+        // If no song is playing but there are songs in queue, play the first one
+        if (currentSong == null && GlobalAudioPlayerService.GetPlayQueue().Count > 0)
+        {
+            PlayFromQueue(0);
+            return;
+        }
+
         GlobalAudioPlayerService.TogglePlayPause();
         isPlaying = GlobalAudioPlayerService.GetIsPlaying();
 

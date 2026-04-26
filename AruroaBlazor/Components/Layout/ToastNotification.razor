@@ -1,0 +1,168 @@
+@using Services
+@implements IDisposable
+
+@* Toast notification that appears at top-right of screen *@
+
+@if (isVisible)
+{
+    <div class="toast-container">
+        <div class="toast toast-@toastType">
+            <span class="toast-icon">@GetIcon()</span>
+            <span class="toast-message">@message</span>
+            <button class="toast-close" @onclick="Hide">✕</button>
+        </div>
+    </div>
+}
+
+<style>
+    .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 99999;
+        animation: slideIn 0.3s ease-out;
+    }
+
+    @@keyframes slideIn {
+        from {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    .toast {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        min-width: 300px;
+        max-width: 500px;
+        color: white;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .toast-success {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+
+    .toast-error {
+        background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    }
+
+    .toast-info {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .toast-warning {
+        background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+    }
+
+    .toast-icon {
+        font-size: 20px;
+    }
+
+    .toast-message {
+        flex: 1;
+    }
+
+    .toast-close {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+    }
+
+        .toast-close:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+</style>
+
+@code {
+    private bool isVisible = false;
+    private string message = "";
+    private string toastType = "info";
+    private System.Threading.Timer? hideTimer;
+
+    protected override void OnInitialized()
+    {
+        ToastService.OnShow += ShowToast;
+    }
+
+    private void ShowToast()
+    {
+        InvokeAsync(() =>
+        {
+            message = ToastService.GetMessage();
+            toastType = ToastService.GetToastType();
+            int duration = ToastService.GetDuration();
+
+            isVisible = true;
+            StateHasChanged();
+
+            // Auto-hide after duration
+            if (hideTimer != null)
+            {
+                hideTimer.Dispose();
+            }
+
+            hideTimer = new System.Threading.Timer((state) =>
+            {
+                InvokeAsync(() =>
+                {
+                    Hide();
+                });
+            }, null, duration, System.Threading.Timeout.Infinite);
+        });
+    }
+
+    private void Hide()
+    {
+        isVisible = false;
+        StateHasChanged();
+    }
+
+    private string GetIcon()
+    {
+        if (toastType == "success")
+        {
+            return "✓";
+        }
+        else if (toastType == "error")
+        {
+            return "✕";
+        }
+        else if (toastType == "warning")
+        {
+            return "⚠";
+        }
+        else
+        {
+            return "ℹ";
+        }
+    }
+
+    public void Dispose()
+    {
+        ToastService.OnShow -= ShowToast;
+        
+        if (hideTimer != null)
+        {
+            hideTimer.Dispose();
+        }
+    }
+}

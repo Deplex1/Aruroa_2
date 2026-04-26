@@ -361,3 +361,25 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# =============================================
+# Aurora Music - Custom Ignores
+# =============================================
+
+# Protect sensitive configuration files
+appsettings.json
+appsettings.*.json
+!appsettings.Development.json
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# User uploaded content (if stored locally)
+wwwroot/uploads/
+
+# Environment variables
+.env
+.env.local
+.env.production

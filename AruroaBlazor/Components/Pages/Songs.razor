@@ -71,11 +71,19 @@
 
         @if (songList == null)
         {
-            <p class="loading-message">Loading songs...</p>
+            <LoadingSpinner Message="Loading songs..." />
         }
         else if (songList.Count == 0)
         {
-            <p class="no-songs-message">No songs found.</p>
+            <div class="empty-state">
+                <div class="empty-state-icon">🎵</div>
+                <h3>No songs found</h3>
+                <p>Try adjusting your filters or search terms</p>
+                @if (currentUser != null)
+                {
+                    <a href="/upload" class="btn btn-primary">Upload a Song</a>
+                }
+            </div>
         }
         else
         {
@@ -331,11 +339,13 @@
 
             if (result > 0)
             {
-                Console.WriteLine("Song added to playlist successfully");
+                // Get playlist name for toast message
+                string playlistName = GetPlaylistNameById(playlistId);
+                ToastService.ShowSuccess($"Song added to '{playlistName}'");
             }
             else
             {
-                Console.WriteLine("Failed to add song to playlist");
+                ToastService.ShowError("Failed to add song to playlist");
             }
 
             // Hide context menu
@@ -344,7 +354,22 @@
         catch (Exception ex)
         {
             Console.WriteLine("Error adding song to playlist: " + ex.Message);
+            ToastService.ShowError("An error occurred. Please try again.");
         }
+    }
+
+    // Get playlist name by ID
+    private string GetPlaylistNameById(int playlistId)
+    {
+        for (int i = 0; i < userPlaylists.Count; i = i + 1)
+        {
+            if (userPlaylists[i].playlistid == playlistId)
+            {
+                return userPlaylists[i].name;
+            }
+        }
+
+        return "playlist";
     }
 
     private async Task Search()
@@ -398,11 +423,13 @@
     {
         GlobalAudioPlayerService.PlayNow(song);
         await songService.IncrementPlayCountAsync(song.songID);
+        ToastService.ShowInfo($"Now playing: {song.title}");
     }
 
     private void AddToQueue(Song song)
     {
         GlobalAudioPlayerService.AddToQueue(song);
+        ToastService.ShowSuccess($"Added '{song.title}' to queue");
     }
 
     private string GetSongCardClass(int songId)
