@@ -7,7 +7,7 @@ namespace Models
         // Basic song information
         public int songID { get; set; }
         public string title { get; set; }
-        public int duration { get; set; } // Duration in seconds
+         public int duration { get; set; } // Duration in seconds
         public byte[] audioData { get; set; } // The actual MP3 file stored as binary data
         public int userid { get; set; } // Which user uploaded this song
 
