@@ -24,6 +24,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StatisticAPI", "StatisticAP
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APi_test", "APi_test\APi_test.csproj", "{439AC6AB-46C7-4352-918B-4D51CC1BBF5F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AruroaAPI", "AruroaAPI\AruroaAPI.csproj", "{4DEC6A76-A39F-EF06-DAD8-483333858E86}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -62,6 +64,10 @@ Global
 		{439AC6AB-46C7-4352-918B-4D51CC1BBF5F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{439AC6AB-46C7-4352-918B-4D51CC1BBF5F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{439AC6AB-46C7-4352-918B-4D51CC1BBF5F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4DEC6A76-A39F-EF06-DAD8-483333858E86}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4DEC6A76-A39F-EF06-DAD8-483333858E86}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4DEC6A76-A39F-EF06-DAD8-483333858E86}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4DEC6A76-A39F-EF06-DAD8-483333858E86}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

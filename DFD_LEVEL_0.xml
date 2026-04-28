@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net">
+  <diagram name="DFD Level 0 - Aruroa" id="dfd-0">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        
+        <!-- Central Process (Circle) -->
+        <mxCell id="central" value="0&#xa;&#xa;מערכת Aruroa&#xa;ניהול מוזיקה" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=16;fontStyle=1;fontColor=#000000;strokeWidth=3" vertex="1" parent="1">
+          <mxGeometry x="460" y="300" width="250" height="250" as="geometry"/>
+        </mxCell>
+        
+        <!-- External Entities (Rectangles) -->
+        
+        <!-- User (Left) -->
+        <mxCell id="user" value="משתמש רגיל&#xa;(User)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1;fontColor=#000000;strokeWidth=2" vertex="1" parent="1">
+          <mxGeometry x="80" y="395" width="140" height="60" as="geometry"/>
+        </mxCell>
+        
+        <!-- Guest (Top Left) -->
+        <mxCell id="guest" value="אורח&#xa;(Guest)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1;fontColor=#000000;strokeWidth=2" vertex="1" parent="1">
+          <mxGeometry x="200" y="150" width="140" height="60" as="geometry"/>
+        </mxCell>
+        
+        <!-- Admin (Top Right) -->
+        <mxCell id="admin" value="מנהל מערכת&#xa;(Admin)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;fontStyle=1;fontColor=#000000;strokeWidth=2" vertex="1" parent="1">
+          <mxGeometry x="830" y="150" width="140" height="60" as="geometry"/>
+        </mxCell>
+        
+        <!-- MySQL Database (Bottom) -->
+        <mxCell id="database" value="בסיס נתונים&#xa;MySQL" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;fontStyle=1;fontColor=#000000;strokeWidth=2" vertex="1" parent="1">
+          <mxGeometry x="515" y="620" width="140" height="60" as="geometry"/>
+        </mxCell>
+        
+        <!-- Browser (Right) -->
+        <mxCell id="browser" value="דפדפן&#xa;(Browser)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;fontColor=#000000;strokeWidth=2" vertex="1" parent="1">
+          <mxGeometry x="950" y="395" width="140" height="60" as="geometry"/>
+        </mxCell>
+        
+        <!-- Data Flows -->
+        
+        <!-- User to System -->
+        <mxCell id="flow1" value="העלאת שירים&#xa;יצירת פלייליסטים&#xa;דירוג שירים" style="endArrow=classic;html=1;fontSize=11;fontColor=#000000;strokeWidth=2;strokeColor=#666666" edge="1" parent="1" source="user" target="central">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="300" y="400" as="sourcePoint"/>
+            <mxPoint x="350" y="350" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- System to User -->
+        <mxCell id="flow2" value="רשימת שירים&#xa;פלייליסטים&#xa;סטטיסטיקות" style="endArrow=classic;html=1;fontSize=11;fontColor=#000000;strokeWidth=2;strokeColor=#666666;dashed=1" edge="1" parent="1" source="central" target="user">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="300" y="400" as="sourcePoint"/>
+            <mxPoint x="350" y="350" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Guest to System -->
+        <mxCell id="flow3" value="הרשמה&#xa;התחברות&#xa;חיפוש שירים" style="endArrow=classic;html=1;fontSize=11;fontColor=#000000;strokeWidth=2;strokeColor=#666666" edge="1" parent="1" source="guest" target="central">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="500" y="300" as="sourcePoint"/>
+            <mxPoint x="550" y="250" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- System to Guest -->
+        <mxCell id="flow4" value="רשימת שירים&#xa;תוצאות חיפוש" style="endArrow=classic;html=1;fontSize=11;fontColor=#000000;strokeWidth=2;strokeColor=#666666;dashed=1" edge="1" parent="1" source="central" target="guest">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="500" y="300" as="sourcePoint"/>
+            <mxPoint x="550" y="250" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Admin to System -->
+        <mxCell id="flow5" value="ניהול משתמשים&#xa;ניהול ז'אנרים&#xa;מחיקת שירים&#xa;אישור בקשות" style="endArrow=classic;html=1;fontSize=11;fontColor=#000000;strokeWidth=2;strokeColor=#d79b00" edge="1" parent="1" source="admin" target="central">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="400" as="sourcePoint"/>
+            <mxPoint x="850" y="350" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- System to Admin -->
+        <mxCell id="flow6" value="דוחות סטטיסטיקה&#xa;רשימת משתמשים&#xa;בקשות ממתינות" style="endArrow=classic;html=1;fontSize=11;fontColor=#000000;strokeWidth=2;strokeColor=#d79b00;dashed=1" edge="1" parent="1" source="central" target="admin">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="400" as="sourcePoint"/>
+            <mxPoint x="850" y="350" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- System to Database -->
+        <mxCell id="flow7" value="שאילתות SQL&#xa;(INSERT, UPDATE,&#xa;DELETE, SELECT)" style="endArrow=classic;html=1;fontSize=11;fontColor=#000000;strokeWidth=2;strokeColor=#b85450" edge="1" parent="1" source="central" target="database">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="500" y="500" as="sourcePoint"/>
+            <mxPoint x="550" y="450" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Database to System -->
+        <mxCell id="flow8" value="נתוני שירים&#xa;נתוני משתמשים&#xa;פלייליסטים, דירוגים" style="endArrow=classic;html=1;fontSize=11;fontColor=#000000;strokeWidth=2;strokeColor=#b85450;dashed=1" edge="1" parent="1" source="database" target="central">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="500" y="500" as="sourcePoint"/>
+            <mxPoint x="550" y="450" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- System to Browser -->
+        <mxCell id="flow11" value="HTML + CSS&#xa;נתוני JSON&#xa;Base64 Audio" style="endArrow=classic;html=1;fontSize=11;fontColor=#000000;strokeWidth=2;strokeColor=#9673a6;dashed=1" edge="1" parent="1" source="central" target="browser">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="450" as="sourcePoint"/>
+            <mxPoint x="850" y="400" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Browser to System -->
+        <mxCell id="flow12" value="HTTP Requests&#xa;פעולות משתמש" style="endArrow=classic;html=1;fontSize=11;fontColor=#000000;strokeWidth=2;strokeColor=#9673a6" edge="1" parent="1" source="browser" target="central">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="450" as="sourcePoint"/>
+            <mxPoint x="850" y="400" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Title -->
+        <mxCell id="title" value="DFD Level 0 - מערכת Aruroa לניהול מוזיקה" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#000000" vertex="1" parent="1">
+          <mxGeometry x="290" y="30" width="590" height="40" as="geometry"/>
+        </mxCell>
+        
+        <!-- Legend -->
+        <mxCell id="legend_title" value="מקרא:" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#000000" vertex="1" parent="1">
+          <mxGeometry x="40" y="720" width="60" height="30" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="legend1" value="זרימת נתונים (קלט למערכת)" style="endArrow=classic;html=1;fontSize=11;fontColor=#000000;strokeWidth=2;strokeColor=#666666" edge="1" parent="1">
+          <mxGeometry width="160" height="50" relative="1" as="geometry">
+            <mxPoint x="120" y="740" as="sourcePoint"/>
+            <mxPoint x="220" y="740" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="legend2" value="תגובה מהמערכת (פלט)" style="endArrow=classic;html=1;fontSize=11;fontColor=#000000;strokeWidth=2;strokeColor=#666666;dashed=1" edge="1" parent="1">
+          <mxGeometry width="160" height="50" relative="1" as="geometry">
+            <mxPoint x="120" y="770" as="sourcePoint"/>
+            <mxPoint x="220" y="770" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
