@@ -1,10 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:Class="Maui.MainPage"
              Title="Aruroa Music">
 
-    <Grid RowDefinitions="Auto,*" Padding="20">
+    <Grid RowDefinitions="Auto,*,Auto" Padding="20">
         
         <!-- Header -->
         <VerticalStackLayout Grid.Row="0" Spacing="10" Margin="0,0,0,20">
@@ -31,7 +32,7 @@
 
         <!-- Songs List -->
         <ScrollView Grid.Row="1">
-            <CollectionView x:Name="SongsCollection" SelectionMode="None">
+            <CollectionView x:Name="SongsCollection" SelectionMode="Single" SelectionChanged="OnSongSelected">
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
                         <Frame Margin="0,5" Padding="15" BorderColor="LightGray" CornerRadius="10">
@@ -72,6 +73,38 @@
                 </CollectionView.ItemTemplate>
             </CollectionView>
         </ScrollView>
+
+        <!-- Audio Player -->
+        <Frame Grid.Row="2" Padding="15" BorderColor="DarkGray" CornerRadius="10" Margin="0,10,0,0" IsVisible="False" x:Name="PlayerFrame">
+            <VerticalStackLayout Spacing="10">
+                <Label 
+                    x:Name="NowPlayingLabel"
+                    Text="Now Playing: "
+                    FontSize="16"
+                    FontAttributes="Bold"
+                    HorizontalOptions="Center" />
+                
+                <toolkit:MediaElement 
+                    x:Name="AudioPlayer"
+                    ShouldShowPlaybackControls="True"
+                    HeightRequest="60" />
+                
+                <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
+                    <Button 
+                        Text="▶️ Play"
+                        Clicked="OnPlayClicked"
+                        WidthRequest="100" />
+                    <Button 
+                        Text="⏸️ Pause"
+                        Clicked="OnPauseClicked"
+                        WidthRequest="100" />
+                    <Button 
+                        Text="⏹️ Stop"
+                        Clicked="OnStopClicked"
+                        WidthRequest="100" />
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+        </Frame>
         
     </Grid>
 

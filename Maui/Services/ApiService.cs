@@ -28,12 +28,29 @@ namespace Maui.Services
         {
             try
             {
-                var songs = await _httpClient.GetFromJsonAsync<List<Song>>("songs");
-                return songs ?? new List<Song>();
+                System.Diagnostics.Debug.WriteLine($"Calling API: {_httpClient.BaseAddress}Songs");
+                
+                var response = await _httpClient.GetAsync("Songs");
+                var content = await response.Content.ReadAsStringAsync();
+                
+                System.Diagnostics.Debug.WriteLine($"Response Status: {response.StatusCode}");
+                System.Diagnostics.Debug.WriteLine($"Response Content: {content}");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var songs = await response.Content.ReadFromJsonAsync<List<Song>>();
+                    return songs ?? new List<Song>();
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"API Error: {response.StatusCode}");
+                    return new List<Song>();
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error fetching songs: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Exception: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Full Exception: {ex}");
                 return new List<Song>();
             }
         }
@@ -42,7 +59,7 @@ namespace Maui.Services
         {
             try
             {
-                return await _httpClient.GetFromJsonAsync<Song>($"songs/{id}");
+                return await _httpClient.GetFromJsonAsync<Song>($"Songs/{id}");
             }
             catch (Exception ex)
             {
