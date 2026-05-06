@@ -26,7 +26,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APi_test", "APi_test\APi_te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AruroaAPI", "AruroaAPI\AruroaAPI.csproj", "{4DEC6A76-A39F-EF06-DAD8-483333858E86}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Maui", "Maui\Maui.csproj", "{6DABD5B0-549A-4F0E-9956-F4BEBE462C03}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AruroaMusicPlayer", "AruroaMusicPlayer\AruroaMusicPlayer.csproj", "{F998DE8B-CF8E-8D18-E822-CF3EA1BA6BC0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -70,10 +70,10 @@ Global
 		{4DEC6A76-A39F-EF06-DAD8-483333858E86}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4DEC6A76-A39F-EF06-DAD8-483333858E86}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4DEC6A76-A39F-EF06-DAD8-483333858E86}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6DABD5B0-549A-4F0E-9956-F4BEBE462C03}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6DABD5B0-549A-4F0E-9956-F4BEBE462C03}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6DABD5B0-549A-4F0E-9956-F4BEBE462C03}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6DABD5B0-549A-4F0E-9956-F4BEBE462C03}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F998DE8B-CF8E-8D18-E822-CF3EA1BA6BC0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F998DE8B-CF8E-8D18-E822-CF3EA1BA6BC0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F998DE8B-CF8E-8D18-E822-CF3EA1BA6BC0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F998DE8B-CF8E-8D18-E822-CF3EA1BA6BC0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

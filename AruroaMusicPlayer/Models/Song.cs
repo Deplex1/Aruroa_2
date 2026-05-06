@@ -1,30 +1,31 @@
-using System.Text.Json.Serialization;
+using Newtonsoft.Json;
 
-namespace Maui.Models
+namespace AruroaMusicPlayer.Models
 {
     public class Song
     {
-        [JsonPropertyName("songID")]
+        [JsonProperty("songID")]
         public int SongId { get; set; }
-        
-        [JsonPropertyName("title")]
+
+        [JsonProperty("title")]
         public string Title { get; set; } = string.Empty;
-        
-        [JsonPropertyName("duration")]
+
+        [JsonProperty("duration")]
         public int Duration { get; set; }
-        
-        [JsonPropertyName("audioData")]
+
+        [JsonProperty("audioData")]
         public string? AudioData { get; set; }
-        
-        [JsonPropertyName("userID")]
+
+        [JsonProperty("userID")]
         public int UserId { get; set; }
-        
-        [JsonPropertyName("uploaded")]
+
+        [JsonProperty("uploaded")]
         public DateTime Uploaded { get; set; }
-        
-        [JsonPropertyName("plays")]
+
+        [JsonProperty("plays")]
         public int Plays { get; set; }
 
+        // Display properties
         public string DurationFormatted => TimeSpan.FromSeconds(Duration).ToString(@"mm\:ss");
         public string UploadedFormatted => Uploaded.ToString("dd/MM/yyyy");
     }
