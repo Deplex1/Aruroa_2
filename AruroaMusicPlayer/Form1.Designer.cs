@@ -72,7 +72,7 @@
             this.btnLoadSongs.Name = "btnLoadSongs";
             this.btnLoadSongs.Size = new System.Drawing.Size(100, 30);
             this.btnLoadSongs.TabIndex = 1;
-            this.btnLoadSongs.Text = "🔄 All Songs";
+            this.btnLoadSongs.Text = "All Songs";
             this.btnLoadSongs.UseVisualStyleBackColor = true;
             this.btnLoadSongs.Click += new System.EventHandler(this.btnLoadSongs_Click);
             
@@ -82,7 +82,7 @@
             this.btnPopular.Name = "btnPopular";
             this.btnPopular.Size = new System.Drawing.Size(100, 30);
             this.btnPopular.TabIndex = 2;
-            this.btnPopular.Text = "🔥 Popular";
+            this.btnPopular.Text = "Popular";
             this.btnPopular.UseVisualStyleBackColor = true;
             this.btnPopular.Click += new System.EventHandler(this.btnPopular_Click);
             
@@ -92,7 +92,7 @@
             this.btnNew.Name = "btnNew";
             this.btnNew.Size = new System.Drawing.Size(100, 30);
             this.btnNew.TabIndex = 3;
-            this.btnNew.Text = "✨ New";
+            this.btnNew.Text = "New";
             this.btnNew.UseVisualStyleBackColor = true;
             this.btnNew.Click += new System.EventHandler(this.btnNew_Click);
             
@@ -111,7 +111,7 @@
             this.btnSearch.Name = "btnSearch";
             this.btnSearch.Size = new System.Drawing.Size(94, 25);
             this.btnSearch.TabIndex = 5;
-            this.btnSearch.Text = "🔍 Search";
+            this.btnSearch.Text = "Search";
             this.btnSearch.UseVisualStyleBackColor = true;
             this.btnSearch.Click += new System.EventHandler(this.btnSearch_Click);
             
@@ -140,7 +140,7 @@
             this.lblNowPlaying.Name = "lblNowPlaying";
             this.lblNowPlaying.Size = new System.Drawing.Size(150, 21);
             this.lblNowPlaying.TabIndex = 8;
-            this.lblNowPlaying.Text = "🎵 Now Playing: -";
+            this.lblNowPlaying.Text = "Now Playing: -";
             
             // trackBarPosition
             this.trackBarPosition.Location = new System.Drawing.Point(12, 400);
@@ -173,7 +173,7 @@
             this.btnPlay.Name = "btnPlay";
             this.btnPlay.Size = new System.Drawing.Size(80, 40);
             this.btnPlay.TabIndex = 12;
-            this.btnPlay.Text = "▶️ Play";
+            this.btnPlay.Text = "▶Play";
             this.btnPlay.UseVisualStyleBackColor = true;
             this.btnPlay.Click += new System.EventHandler(this.btnPlay_Click);
             
@@ -183,7 +183,7 @@
             this.btnPause.Name = "btnPause";
             this.btnPause.Size = new System.Drawing.Size(80, 40);
             this.btnPause.TabIndex = 13;
-            this.btnPause.Text = "⏸️ Pause";
+            this.btnPause.Text = "Pause";
             this.btnPause.UseVisualStyleBackColor = true;
             this.btnPause.Click += new System.EventHandler(this.btnPause_Click);
             
@@ -193,7 +193,7 @@
             this.btnStop.Name = "btnStop";
             this.btnStop.Size = new System.Drawing.Size(80, 40);
             this.btnStop.TabIndex = 14;
-            this.btnStop.Text = "⏹️ Stop";
+            this.btnStop.Text = "Stop";
             this.btnStop.UseVisualStyleBackColor = true;
             this.btnStop.Click += new System.EventHandler(this.btnStop_Click);
             
