@@ -1,0 +1,261 @@
+@page "/adminDashboard/managePlaylists"
+
+@using Models
+@using Services
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject ProtectedSessionStorage Storage
+@inject NavigationManager Nav
+@inject PlaylistService PlaylistService
+@inject UserAdminService UserAdminService
+
+<h1>Manage Playlists</h1>
+
+@if (user == null)
+{
+    <p>You must be logged in to view this page.</p>
+}
+else if (user.IsAdmin == 0)
+{
+    <p>You are not an admin.</p>
+}
+else
+{
+    <div style="margin-bottom: 20px;">
+        <button class="btn btn-secondary" @onclick="GoBack">← Back to Dashboard</button>
+        <button class="btn btn-primary" @onclick="LoadAllPlaylists" style="margin-left: 10px;">🔄 Refresh</button>
+    </div>
+
+    @if (isLoading)
+    {
+        <p>Loading playlists...</p>
+    }
+    else if (allUsers.Count == 0)
+    {
+        <p>No users found.</p>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <strong>Total Users:</strong> @allUsers.Count | <strong>Total Playlists:</strong> @totalPlaylists
+        </div>
+
+        @foreach (var usr in allUsers)
+        {
+            var userPlaylists = allPlaylists.Where(p => p.userid == usr.userid).ToList();
+            
+            @if (userPlaylists.Count > 0)
+            {
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5>👤 @usr.username (@usr.email) - @userPlaylists.Count playlist(s)</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Playlist Name</th>
+                                    <th>Visibility</th>
+                                    <th>Created</th>
+                                    <th>Songs</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var playlist in userPlaylists)
+                                {
+                                    <tr>
+                                        <td>@playlist.name</td>
+                                        <td>
+                                            @if (playlist.ispublic)
+                                            {
+                                                <span class="badge bg-success">Public</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Private</span>
+                                            }
+                                        </td>
+                                        <td>@(playlist.created?.ToString("yyyy-MM-dd") ?? "N/A")</td>
+                                        <td>
+                                            @if (songCounts.ContainsKey(playlist.playlistid))
+                                            {
+                                                @songCounts[playlist.playlistid]
+                                            }
+                                            else
+                                            {
+                                                <text>0</text>
+                                            }
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-info" @onclick="() => ViewPlaylistSongs(playlist.playlistid)">
+                                                View Songs
+                                            </button>
+                                            <button class="btn btn-sm btn-danger" @onclick="() => DeletePlaylist(playlist.playlistid, playlist.name)">
+                                                Delete
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        }
+    }
+
+    @if (selectedPlaylistSongs != null)
+    {
+        <div class="modal" style="display: block; background: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Songs in Playlist</h5>
+                        <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (selectedPlaylistSongs.Count == 0)
+                        {
+                            <p>No songs in this playlist.</p>
+                        }
+                        else
+                        {
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Song ID</th>
+                                        <th>Title</th>
+                                        <th>Duration</th>
+                                        <th>Plays</th>
+                                        <th>Uploaded</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var song in selectedPlaylistSongs)
+                                    {
+                                        <tr>
+                                            <td>@song.songID</td>
+                                            <td>@song.title</td>
+                                            <td>@FormatDuration(song.duration)</td>
+                                            <td>@song.plays</td>
+                                            <td>@song.uploaded.ToString("yyyy-MM-dd")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseModal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private User user = null;
+    private List<User> allUsers = new List<User>();
+    private List<Playlist> allPlaylists = new List<Playlist>();
+    private Dictionary<int, int> songCounts = new Dictionary<int, int>();
+    private bool isLoading = false;
+    private int totalPlaylists = 0;
+    private List<Song> selectedPlaylistSongs = null;
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (!first) return;
+
+        var result = await Storage.GetAsync<User>("user");
+
+        if (result.Success)
+        {
+            user = result.Value;
+            await LoadAllPlaylists();
+        }
+        else
+        {
+            user = null;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task LoadAllPlaylists()
+    {
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Load all users
+            allUsers = await UserAdminService.LoadAllUsersAsync();
+
+            // Load playlists for each user
+            allPlaylists = new List<Playlist>();
+            foreach (var usr in allUsers)
+            {
+                var userPlaylists = await PlaylistService.LoadUserPlaylistsAsync(usr.userid);
+                allPlaylists.AddRange(userPlaylists);
+            }
+
+            totalPlaylists = allPlaylists.Count;
+
+            // Load song counts for all playlists
+            songCounts = await PlaylistService.LoadSongCountsAsync(allPlaylists);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error loading playlists: " + ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ViewPlaylistSongs(int playlistId)
+    {
+        try
+        {
+            selectedPlaylistSongs = await PlaylistService.LoadPlaylistSongsAsync(playlistId, new List<Song>());
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error loading playlist songs: " + ex.Message);
+        }
+    }
+
+    private void CloseModal()
+    {
+        selectedPlaylistSongs = null;
+        StateHasChanged();
+    }
+
+    private async Task DeletePlaylist(int playlistId, string playlistName)
+    {
+        // In Blazor, we can't use JavaScript confirm directly
+        // For now, we'll just delete without confirmation
+        // In a production app, you'd use a modal dialog
+        bool success = await PlaylistService.DeletePlaylistAsync(playlistId);
+        if (success)
+        {
+            await LoadAllPlaylists();
+        }
+    }
+
+    private string FormatDuration(int seconds)
+    {
+        int minutes = seconds / 60;
+        int secs = seconds % 60;
+        return $"{minutes}:{secs:D2}";
+    }
+
+    private void GoBack()
+    {
+        Nav.NavigateTo("/adminDashboard");
+    }
+}

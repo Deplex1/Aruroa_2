@@ -1,0 +1,198 @@
+@page "/adminDashboard/statistics"
+
+@using Models
+@using Services
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using System.Net.Http
+@using System.Text.Json
+@inject ProtectedSessionStorage Storage
+@inject NavigationManager Nav
+@inject IHttpClientFactory HttpClientFactory
+
+<h1>📊 System Statistics</h1>
+
+@if (user == null)
+{
+    <p>You must be logged in to view this page.</p>
+}
+else if (user.IsAdmin == 0)
+{
+    <p>You are not an admin.</p>
+}
+else
+{
+    <div style="margin-bottom: 20px;">
+        <button class="btn btn-secondary" @onclick="GoBack">← Back to Dashboard</button>
+        <button class="btn btn-primary" @onclick="LoadStatistics" style="margin-left: 10px;">🔄 Refresh</button>
+    </div>
+
+    @if (isLoading)
+    {
+        <p>Loading statistics...</p>
+    }
+    else if (stats != null)
+    {
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card text-white bg-primary mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">👥 Total Users</h5>
+                        <h2>@stats.TotalUsers</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-success mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">🎵 Total Songs</h5>
+                        <h2>@stats.TotalSongs</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-info mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">📝 Total Playlists</h5>
+                        <h2>@stats.TotalPlaylists</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-warning mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">▶️ Total Plays</h5>
+                        <h2>@stats.TotalPlays</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>📈 Statistics Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-striped">
+                            <tbody>
+                                <tr>
+                                    <td><strong>Average Songs per User</strong></td>
+                                    <td>@GetAverageSongsPerUser()</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Average Playlists per User</strong></td>
+                                    <td>@GetAveragePlaylistsPerUser()</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Average Plays per Song</strong></td>
+                                    <td>@GetAveragePlaysPerSong()</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else if (errorMessage != null)
+    {
+        <div class="alert alert-danger">
+            <strong>Error:</strong> @errorMessage
+        </div>
+    }
+}
+
+@code {
+    private User user = null;
+    private SiteStats stats = null;
+    private bool isLoading = false;
+    private string errorMessage = null;
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (!first) return;
+
+        var result = await Storage.GetAsync<User>("user");
+
+        if (result.Success)
+        {
+            user = result.Value;
+            await LoadStatistics();
+        }
+        else
+        {
+            user = null;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task LoadStatistics()
+    {
+        isLoading = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient();
+            var response = await httpClient.GetAsync("http://localhost:5230/api/Statistics/system");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                stats = JsonSerializer.Deserialize<SiteStats>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+            else
+            {
+                errorMessage = $"Failed to load statistics: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading statistics: {ex.Message}";
+            Console.WriteLine("Error loading statistics: " + ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetAverageSongsPerUser()
+    {
+        if (stats == null || stats.TotalUsers == 0)
+            return "0.00";
+        
+        double avg = (double)stats.TotalSongs / stats.TotalUsers;
+        return avg.ToString("F2");
+    }
+
+    private string GetAveragePlaylistsPerUser()
+    {
+        if (stats == null || stats.TotalUsers == 0)
+            return "0.00";
+        
+        double avg = (double)stats.TotalPlaylists / stats.TotalUsers;
+        return avg.ToString("F2");
+    }
+
+    private string GetAveragePlaysPerSong()
+    {
+        if (stats == null || stats.TotalSongs == 0)
+            return "0.00";
+        
+        double avg = (double)stats.TotalPlays / stats.TotalSongs;
+        return avg.ToString("F2");
+    }
+
+    private void GoBack()
+    {
+        Nav.NavigateTo("/adminDashboard");
+    }
+}

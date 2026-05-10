@@ -25,6 +25,7 @@ else
         <button style="padding:10px 20px; font-size:16px;" @onclick="GoToManageUsers">Manage Users</button>
         <button style="padding:10px 20px; font-size:16px;" @onclick="GoToManagePlaylists">Manage Playlists</button>
         <button style="padding:10px 20px; font-size:16px;" @onclick="GoToManageSongs">Manage Songs</button>
+        <button style="padding:10px 20px; font-size:16px;" @onclick="GoToStatistics">📊 Statistics</button>
     </div>
 }
 
@@ -72,5 +73,10 @@ else
     private void GoToManageGenresRequest()
     {
         Nav.NavigateTo("/adminDashboard/genreRequests");
+    }
+
+    private void GoToStatistics()
+    {
+        Nav.NavigateTo("/adminDashboard/statistics");
     }
 }

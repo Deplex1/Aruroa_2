@@ -13,6 +13,13 @@ namespace AruroaBlazor
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
 
+            // Add HttpClient for API calls
+            builder.Services.AddHttpClient();
+
+            // Register application services
+            builder.Services.AddScoped<Services.PlaylistService>();
+            builder.Services.AddScoped<Services.UserAdminService>();
+
             // Load connection string from appsettings.json and set it in DB class
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
             if (string.IsNullOrEmpty(connectionString) == false)

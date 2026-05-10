@@ -18,34 +18,136 @@ else
     }
     else
     {
-        <h1>@playlist.name</h1>
-        <p>@songs.Count songs</p>
+        <h1>📝 @playlist.name</h1>
+        <p class="text-muted">@songs.Count song(s) | @(playlist.ispublic ? "🌐 Public" : "🔒 Private")</p>
 
-        <button @onclick="PlayAll">Play All (NOT IMPLEMENTED YET)</button>
-        <button @onclick="ToggleAddSongs">Add Songs</button>
-        <button @onclick="Shuffle">Shuffle</button>
+        <div style="margin-bottom: 20px;">
+            <button class="btn btn-primary" @onclick="PlayAll">▶️ Play All (NOT IMPLEMENTED YET)</button>
+            <button class="btn btn-success" @onclick="ToggleAddSongs">➕ Add Songs</button>
+            <button class="btn btn-info" @onclick="Shuffle">🔀 Shuffle</button>
+        </div>
 
         @if (ShowAddSongs == true)
         {
-            <select @bind="selectedSongId">
-                <option value="0">-- Select song --</option>
+            <div class="add-songs-panel" style="border: 2px solid #007bff; border-radius: 8px; padding: 20px; margin-bottom: 20px; background-color: #f8f9fa;">
+                <h3>Add Songs to Playlist</h3>
+                
+                <div style="margin-bottom: 15px;">
+                    <input type="text" 
+                           placeholder="🔍 Search songs..." 
+                           @bind="songSearchText" 
+                           @oninput="OnSongSearchInput"
+                           class="form-control"
+                           style="max-width: 400px;" />
+                </div>
 
-                @foreach (Song s in filteredSongs)
+                @if (selectedSongIds.Count > 0)
                 {
-                    <option value="@s.songID">@s.title</option>
+                    <div class="alert alert-info">
+                        <strong>@selectedSongIds.Count song(s) selected</strong>
+                        <button class="btn btn-sm btn-primary" @onclick="AddSelectedSongs" style="margin-left: 10px;">
+                            ➕ Add Selected (@selectedSongIds.Count)
+                        </button>
+                        <button class="btn btn-sm btn-secondary" @onclick="ClearSelection" style="margin-left: 5px;">
+                            Clear Selection
+                        </button>
+                    </div>
                 }
-            </select>
 
-            <button @onclick="AddSongToPlaylist">Add</button>
+                <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px; background-color: white;">
+                    @if (displayedSongs.Count == 0)
+                    {
+                        <p class="text-muted">No songs available to add.</p>
+                    }
+                    else
+                    {
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">
+                                        <input type="checkbox" 
+                                               @onchange="ToggleSelectAll"
+                                               checked="@IsAllSelected()" />
+                                    </th>
+                                    <th>Title</th>
+                                    <th>Duration</th>
+                                    <th>Plays</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (Song s in displayedSongs)
+                                {
+                                    bool isSelected = selectedSongIds.Contains(s.songID);
+                                    <tr style="cursor: pointer; @(isSelected ? "background-color: #e7f3ff;" : "")" 
+                                        @onclick="() => ToggleSongSelection(s.songID)">
+                                        <td>
+                                            <input type="checkbox" 
+                                                   checked="@isSelected"
+                                                   @onclick:stopPropagation="true"
+                                                   @onchange="() => ToggleSongSelection(s.songID)" />
+                                        </td>
+                                        <td><strong>@s.title</strong></td>
+                                        <td>@FormatDuration(s.duration)</td>
+                                        <td>@s.plays</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+
+                <div style="margin-top: 15px;">
+                    <button class="btn btn-secondary" @onclick="ToggleAddSongs">Close</button>
+                </div>
+            </div>
         }
 
-        @foreach (Song song in songs)
+        @if (songs.Count == 0)
         {
-            <div>
-                <span>@song.title</span>
-                <button @onclick="() => MoveUp(song)">Up</button>
-                <button @onclick="() => MoveDown(song)">Down</button>
-                <button @onclick="() => RemoveSong(song)">Remove</button>
+            <div class="alert alert-info">
+                <p>This playlist is empty. Click "➕ Add Songs" to add some music!</p>
+            </div>
+        }
+        else
+        {
+            <div style="margin-top: 20px;">
+                <h3>Songs in Playlist</h3>
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">#</th>
+                            <th>Title</th>
+                            <th>Duration</th>
+                            <th>Plays</th>
+                            <th style="width: 200px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < songs.Count; i++)
+                        {
+                            Song song = songs[i];
+                            int position = i + 1;
+                            
+                            <tr>
+                                <td>@position</td>
+                                <td><strong>@song.title</strong></td>
+                                <td>@FormatDuration(song.duration)</td>
+                                <td>@song.plays</td>
+                                <td>
+                                    <button class="btn btn-sm btn-secondary" @onclick="() => MoveUp(song)" disabled="@(i == 0)">
+                                        ⬆️
+                                    </button>
+                                    <button class="btn btn-sm btn-secondary" @onclick="() => MoveDown(song)" disabled="@(i == songs.Count - 1)">
+                                        ⬇️
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" @onclick="() => RemoveSong(song)">
+                                        🗑️ Remove
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             </div>
         }
     }
@@ -66,8 +168,11 @@ else
     private List<Song> songs = new List<Song>();
     private List<Song> allSongs = new List<Song>();
     private List<Song> filteredSongs = new List<Song>();
+    private List<Song> displayedSongs = new List<Song>();
     private bool ShowAddSongs = false;
     private int selectedSongId = 0;
+    private List<int> selectedSongIds = new List<int>();
+    private string songSearchText = "";
 
     // Lifecycle method - loads data on first render
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -115,6 +220,8 @@ else
         if (ShowAddSongs == true)
         {
             ShowAddSongs = false;
+            selectedSongIds.Clear();
+            songSearchText = "";
         }
         else
         {
@@ -128,6 +235,122 @@ else
     private async Task LoadAvailableSongs()
     {
         filteredSongs = await playlistService.LoadAvailableSongsAsync(id);
+        displayedSongs = filteredSongs;
+    }
+
+    // Search songs in the add panel
+    private void OnSongSearchInput(ChangeEventArgs e)
+    {
+        songSearchText = e.Value?.ToString() ?? "";
+        FilterDisplayedSongs();
+    }
+
+    private void FilterDisplayedSongs()
+    {
+        if (string.IsNullOrWhiteSpace(songSearchText))
+        {
+            displayedSongs = filteredSongs;
+        }
+        else
+        {
+            string searchLower = songSearchText.ToLower();
+            displayedSongs = filteredSongs.Where(s => s.title.ToLower().Contains(searchLower)).ToList();
+        }
+        StateHasChanged();
+    }
+
+    // Toggle song selection
+    private void ToggleSongSelection(int songId)
+    {
+        if (selectedSongIds.Contains(songId))
+        {
+            selectedSongIds.Remove(songId);
+        }
+        else
+        {
+            selectedSongIds.Add(songId);
+        }
+        StateHasChanged();
+    }
+
+    // Toggle select all
+    private void ToggleSelectAll(ChangeEventArgs e)
+    {
+        bool isChecked = (bool)(e.Value ?? false);
+        
+        if (isChecked)
+        {
+            // Select all displayed songs
+            selectedSongIds.Clear();
+            foreach (var song in displayedSongs)
+            {
+                selectedSongIds.Add(song.songID);
+            }
+        }
+        else
+        {
+            // Deselect all
+            selectedSongIds.Clear();
+        }
+        StateHasChanged();
+    }
+
+    // Check if all displayed songs are selected
+    private bool IsAllSelected()
+    {
+        if (displayedSongs.Count == 0) return false;
+        
+        foreach (var song in displayedSongs)
+        {
+            if (!selectedSongIds.Contains(song.songID))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Clear selection
+    private void ClearSelection()
+    {
+        selectedSongIds.Clear();
+        StateHasChanged();
+    }
+
+    // Add selected songs to playlist
+    private async Task AddSelectedSongs()
+    {
+        if (selectedSongIds.Count == 0)
+        {
+            return;
+        }
+
+        int maxPos = await playlistService.GetMaxPositionAsync(id);
+        int position = maxPos + 1;
+
+        // Add each selected song
+        foreach (int songId in selectedSongIds)
+        {
+            await playlistService.AddSongToPlaylistAsync(id, songId, position);
+            position++;
+        }
+
+        // Clear selection and refresh
+        selectedSongIds.Clear();
+        songSearchText = "";
+        ShowAddSongs = false;
+
+        await LoadPlaylist();
+        await LoadAvailableSongs();
+        StateHasChanged();
+    }
+
+    // Format duration helper
+    private string FormatDuration(int seconds)
+    {
+        int minutes = seconds / 60;
+        int secs = seconds % 60;
+        return $"{minutes}:{secs:D2}";
     }
 
     // Add song to playlist using service

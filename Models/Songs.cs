@@ -90,7 +90,7 @@ namespace Models
             {
                 return "audio/wav";
             }
-
+                    
             // CHECK #4: Look for AAC file signature
             // AAC files start with 0xFF followed by 0xF0-0xFF
             // Similar to MP3 but with different bit pattern
