@@ -5,6 +5,7 @@
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @using System.Net.Http
 @using System.Text.Json
+@using ApexCharts
 @inject ProtectedSessionStorage Storage
 @inject NavigationManager Nav
 @inject IHttpClientFactory HttpClientFactory
@@ -68,10 +69,53 @@ else
         </div>
 
         <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>📊 Platform Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <ApexChart TItem="StatItem"
+                                   Title="Platform Statistics"
+                                   Options="pieOptions">
+                            <ApexPointSeries TItem="StatItem"
+                                           Items="pieData"
+                                           Name="Count"
+                                           SeriesType="SeriesType.Pie"
+                                           XValue="@(e => e.Label)"
+                                           YAggregate="@(e => e.Sum(e => e.Value))" />
+                        </ApexChart>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>📈 Engagement Metrics</h5>
+                    </div>
+                    <div class="card-body">
+                        <ApexChart TItem="StatItem"
+                                   Title="Average Metrics"
+                                   Options="barOptions">
+                            <ApexPointSeries TItem="StatItem"
+                                           Items="barData"
+                                           Name="Average"
+                                           SeriesType="SeriesType.Bar"
+                                           XValue="@(e => e.Label)"
+                                           YAggregate="@(e => e.Sum(e => e.Value))"
+                                           OrderBy="e => e.X" />
+                        </ApexChart>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
             <div class="col-md-12">
                 <div class="card">
                     <div class="card-header">
-                        <h5>📈 Statistics Overview</h5>
+                        <h5>📋 Detailed Statistics</h5>
                     </div>
                     <div class="card-body">
                         <table class="table table-striped">
@@ -87,6 +131,14 @@ else
                                 <tr>
                                     <td><strong>Average Plays per Song</strong></td>
                                     <td>@GetAveragePlaysPerSong()</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Total Content Items</strong></td>
+                                    <td>@(stats.TotalSongs + stats.TotalPlaylists)</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>User Engagement Rate</strong></td>
+                                    <td>@GetEngagementRate()</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -108,6 +160,53 @@ else
     private SiteStats stats = null;
     private bool isLoading = false;
     private string errorMessage = null;
+
+    // Chart data
+    private List<StatItem> pieData = new List<StatItem>();
+    private List<StatItem> barData = new List<StatItem>();
+
+    // Chart options
+    private ApexChartOptions<StatItem> pieOptions = new ApexChartOptions<StatItem>
+    {
+        Legend = new Legend
+        {
+            Position = LegendPosition.Bottom
+        },
+        Colors = new List<string> { "#007bff", "#28a745", "#17a2b8", "#ffc107" }
+    };
+
+    private ApexChartOptions<StatItem> barOptions = new ApexChartOptions<StatItem>
+    {
+        PlotOptions = new PlotOptions
+        {
+            Bar = new PlotOptionsBar
+            {
+                Horizontal = false,
+                DataLabels = new PlotOptionsBarDataLabels
+                {
+                    Position = BarDataLabelPosition.Top
+                }
+            }
+        },
+        Colors = new List<string> { "#6c757d" },
+        DataLabels = new DataLabels
+        {
+            Enabled = true,
+            OffsetY = -20,
+            Style = new DataLabelsStyle
+            {
+                FontSize = "12px",
+                Colors = new List<string> { "#304758" }
+            }
+        }
+    };
+
+    // Helper class for chart data
+    public class StatItem
+    {
+        public string Label { get; set; }
+        public decimal Value { get; set; }
+    }
 
     protected override async Task OnAfterRenderAsync(bool first)
     {
@@ -146,6 +245,9 @@ else
                 {
                     PropertyNameCaseInsensitive = true
                 });
+
+                // Prepare chart data
+                PrepareChartData();
             }
             else
             {
@@ -162,6 +264,28 @@ else
             isLoading = false;
             StateHasChanged();
         }
+    }
+
+    private void PrepareChartData()
+    {
+        if (stats == null) return;
+
+        // Pie chart data - Platform overview
+        pieData = new List<StatItem>
+        {
+            new StatItem { Label = "Users", Value = stats.TotalUsers },
+            new StatItem { Label = "Songs", Value = stats.TotalSongs },
+            new StatItem { Label = "Playlists", Value = stats.TotalPlaylists },
+            new StatItem { Label = "Plays (÷100)", Value = stats.TotalPlays / 100 } // Scale down for visibility
+        };
+
+        // Bar chart data - Averages
+        barData = new List<StatItem>
+        {
+            new StatItem { Label = "Songs/User", Value = decimal.Parse(GetAverageSongsPerUser()) },
+            new StatItem { Label = "Playlists/User", Value = decimal.Parse(GetAveragePlaylistsPerUser()) },
+            new StatItem { Label = "Plays/Song", Value = decimal.Parse(GetAveragePlaysPerSong()) }
+        };
     }
 
     private string GetAverageSongsPerUser()
@@ -189,6 +313,19 @@ else
         
         double avg = (double)stats.TotalPlays / stats.TotalSongs;
         return avg.ToString("F2");
+    }
+
+    private string GetEngagementRate()
+    {
+        if (stats == null || stats.TotalSongs == 0)
+            return "0.00%";
+        
+        // Engagement rate = (Total Plays / Total Songs) / Total Users * 100
+        if (stats.TotalUsers == 0)
+            return "0.00%";
+        
+        double rate = ((double)stats.TotalPlays / stats.TotalSongs) / stats.TotalUsers * 100;
+        return rate.ToString("F2") + "%";
     }
 
     private void GoBack()
