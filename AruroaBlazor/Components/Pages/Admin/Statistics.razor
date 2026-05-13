@@ -136,10 +136,6 @@ else
                                     <td><strong>Total Content Items</strong></td>
                                     <td>@(stats.TotalSongs + stats.TotalPlaylists)</td>
                                 </tr>
-                                <tr>
-                                    <td><strong>User Engagement Rate</strong></td>
-                                    <td>@GetEngagementRate()</td>
-                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -313,19 +309,6 @@ else
         
         double avg = (double)stats.TotalPlays / stats.TotalSongs;
         return avg.ToString("F2");
-    }
-
-    private string GetEngagementRate()
-    {
-        if (stats == null || stats.TotalSongs == 0)
-            return "0.00%";
-        
-        // Engagement rate = (Total Plays / Total Songs) / Total Users * 100
-        if (stats.TotalUsers == 0)
-            return "0.00%";
-        
-        double rate = ((double)stats.TotalPlays / stats.TotalSongs) / stats.TotalUsers * 100;
-        return rate.ToString("F2") + "%";
     }
 
     private void GoBack()

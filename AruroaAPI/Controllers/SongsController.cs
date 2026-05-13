@@ -184,20 +184,40 @@ namespace AruroaAPI.Controllers
         }
 
         /// <summary>
-        /// Delete a song
+        /// Delete a song (Owner or Admin only)
         /// </summary>
-        /// <param name="id">Song ID</param>
+        /// <param name="id">Song ID to delete</param>
+        /// <param name="requestingUserId">ID of user making the request (from header)</param>
         /// <returns>Success message</returns>
         [HttpDelete("{id}")]
-        public async Task<ActionResult> DeleteSong(int id)
+        public async Task<ActionResult> DeleteSong(int id, [FromHeader(Name = "X-User-Id")] int requestingUserId)
         {
             try
             {
-                var result = await _songDB.DeleteSongAsync(id);
-                if (result == 0)
+                // 1. Get the song
+                var song = await _songDB.SelectByIdAsync(id);
+                if (song == null)
                 {
                     return NotFound(new { message = $"Song with ID {id} not found" });
                 }
+                
+                // 2. Get requesting user
+                var userDB = new UserDB();
+                var requestingUser = await userDB.SelectByIdAsync(requestingUserId);
+                
+                if (requestingUser == null)
+                {
+                    return Unauthorized(new { message = "Authentication required. User not found." });
+                }
+                
+                // 3. Check if user owns the song OR is admin
+                if (song.userid != requestingUserId && requestingUser.IsAdmin == 0)
+                {
+                    return StatusCode(403, new { message = "Forbidden. You can only delete your own songs unless you are an admin." });
+                }
+                
+                // 4. Proceed with deletion
+                var result = await _songDB.DeleteSongAsync(id);
                 return Ok(new { message = "Song deleted successfully" });
             }
             catch (Exception ex)

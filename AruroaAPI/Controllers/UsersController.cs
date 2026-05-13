@@ -204,20 +204,42 @@ namespace AruroaAPI.Controllers
         }
 
         /// <summary>
-        /// Delete user
+        /// Delete user (Admin only)
         /// </summary>
-        /// <param name="id">User ID</param>
+        /// <param name="id">User ID to delete</param>
+        /// <param name="requestingUserId">ID of user making the request (from header)</param>
         /// <returns>Success message</returns>
         [HttpDelete("{id}")]
-        public async Task<ActionResult> DeleteUser(int id)
+        public async Task<ActionResult> DeleteUser(int id, [FromHeader(Name = "X-User-Id")] int requestingUserId)
         {
             try
             {
+                // 1. Verify requesting user exists and is admin
+                var requestingUser = await _userDB.SelectByIdAsync(requestingUserId);
+                
+                if (requestingUser == null)
+                {
+                    return Unauthorized(new { message = "Authentication required. User not found." });
+                }
+                
+                if (requestingUser.IsAdmin == 0)
+                {
+                    return StatusCode(403, new { message = "Forbidden. Admin access required." });
+                }
+                
+                // 2. Prevent self-deletion
+                if (id == requestingUserId)
+                {
+                    return BadRequest(new { message = "Cannot delete yourself" });
+                }
+                
+                // 3. Proceed with deletion
                 int result = await _userDB.DeleteUserAsync(id);
                 if (result == 0)
                 {
                     return NotFound(new { message = $"User with ID {id} not found" });
                 }
+                
                 return Ok(new { message = "User deleted successfully" });
             }
             catch (Exception ex)

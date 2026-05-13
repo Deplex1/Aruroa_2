@@ -170,20 +170,40 @@ namespace AruroaAPI.Controllers
         }
 
         /// <summary>
-        /// Delete playlist
+        /// Delete playlist (Owner or Admin only)
         /// </summary>
-        /// <param name="id">Playlist ID</param>
+        /// <param name="id">Playlist ID to delete</param>
+        /// <param name="requestingUserId">ID of user making the request (from header)</param>
         /// <returns>Success message</returns>
         [HttpDelete("{id}")]
-        public async Task<ActionResult> DeletePlaylist(int id)
+        public async Task<ActionResult> DeletePlaylist(int id, [FromHeader(Name = "X-User-Id")] int requestingUserId)
         {
             try
             {
-                int result = await _playlistDB.DeletePlaylistAsync(id);
-                if (result == 0)
+                // 1. Get the playlist
+                var playlist = await _playlistDB.SelectByIdAsync(id);
+                if (playlist == null)
                 {
                     return NotFound(new { message = $"Playlist with ID {id} not found" });
                 }
+                
+                // 2. Get requesting user
+                var userDB = new UserDB();
+                var requestingUser = await userDB.SelectByIdAsync(requestingUserId);
+                
+                if (requestingUser == null)
+                {
+                    return Unauthorized(new { message = "Authentication required. User not found." });
+                }
+                
+                // 3. Check if user owns the playlist OR is admin
+                if (playlist.userid != requestingUserId && requestingUser.IsAdmin == 0)
+                {
+                    return StatusCode(403, new { message = "Forbidden. You can only delete your own playlists unless you are an admin." });
+                }
+                
+                // 4. Proceed with deletion
+                int result = await _playlistDB.DeletePlaylistAsync(id);
                 return Ok(new { message = "Playlist deleted successfully" });
             }
             catch (Exception ex)

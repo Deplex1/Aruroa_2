@@ -116,18 +116,35 @@ namespace AruroaAPI.Controllers
         /// <summary>
         /// Delete genre (Admin only)
         /// </summary>
-        /// <param name="id">Genre ID</param>
+        /// <param name="id">Genre ID to delete</param>
+        /// <param name="requestingUserId">ID of user making the request (from header)</param>
         /// <returns>Success message</returns>
         [HttpDelete("{id}")]
-        public async Task<ActionResult> DeleteGenre(int id)
+        public async Task<ActionResult> DeleteGenre(int id, [FromHeader(Name = "X-User-Id")] int requestingUserId)
         {
             try
             {
+                // 1. Verify requesting user exists and is admin
+                var userDB = new UserDB();
+                var requestingUser = await userDB.SelectByIdAsync(requestingUserId);
+                
+                if (requestingUser == null)
+                {
+                    return Unauthorized(new { message = "Authentication required. User not found." });
+                }
+                
+                if (requestingUser.IsAdmin == 0)
+                {
+                    return StatusCode(403, new { message = "Forbidden. Admin access required to delete genres." });
+                }
+                
+                // 2. Proceed with deletion
                 int result = await _genreDB.DeleteGenreAsync(id);
                 if (result == 0)
                 {
                     return NotFound(new { message = $"Genre with ID {id} not found" });
                 }
+                
                 return Ok(new { message = "Genre deleted successfully" });
             }
             catch (Exception ex)
@@ -251,17 +268,41 @@ namespace AruroaAPI.Controllers
         }
 
         /// <summary>
-        /// Remove genre from song
+        /// Remove genre from song (Owner or Admin only)
         /// </summary>
         /// <param name="songId">Song ID</param>
         /// <param name="genreId">Genre ID</param>
+        /// <param name="requestingUserId">ID of user making the request (from header)</param>
         /// <returns>Success message</returns>
         [HttpDelete("song/{songId}/genre/{genreId}")]
-        public async Task<ActionResult> RemoveGenreFromSong(int songId, int genreId)
+        public async Task<ActionResult> RemoveGenreFromSong(int songId, int genreId, [FromHeader(Name = "X-User-Id")] int requestingUserId)
         {
             try
             {
-                // Delete all genres for song then check if any were deleted
+                // 1. Get the song
+                var songDB = new SongDB();
+                var song = await songDB.SelectByIdAsync(songId);
+                if (song == null)
+                {
+                    return NotFound(new { message = $"Song with ID {songId} not found" });
+                }
+                
+                // 2. Get requesting user
+                var userDB = new UserDB();
+                var requestingUser = await userDB.SelectByIdAsync(requestingUserId);
+                
+                if (requestingUser == null)
+                {
+                    return Unauthorized(new { message = "Authentication required. User not found." });
+                }
+                
+                // 3. Check if user owns the song OR is admin
+                if (song.userid != requestingUserId && requestingUser.IsAdmin == 0)
+                {
+                    return StatusCode(403, new { message = "Forbidden. You can only modify genres for your own songs unless you are an admin." });
+                }
+                
+                // 4. Delete all genres for song then check if any were deleted
                 var genresBefore = await _songGenreDB.GetGenresForSongAsync(songId);
                 var hadGenre = genresBefore.Any(sg => sg.genreid == genreId);
                 

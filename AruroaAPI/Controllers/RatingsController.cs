@@ -118,24 +118,40 @@ namespace AruroaAPI.Controllers
         }
 
         /// <summary>
-        /// Delete rating
+        /// Delete rating (Owner only)
         /// </summary>
-        /// <param name="userId">User ID</param>
+        /// <param name="userId">User ID who owns the rating</param>
         /// <param name="songId">Song ID</param>
+        /// <param name="requestingUserId">ID of user making the request (from header)</param>
         /// <returns>Success message</returns>
         [HttpDelete("user/{userId}/song/{songId}")]
-        public async Task<ActionResult> DeleteRating(int userId, int songId)
+        public async Task<ActionResult> DeleteRating(int userId, int songId, [FromHeader(Name = "X-User-Id")] int requestingUserId)
         {
             try
             {
-                // Get the rating first
+                // 1. Verify requesting user
+                var userDB = new UserDB();
+                var requestingUser = await userDB.SelectByIdAsync(requestingUserId);
+                
+                if (requestingUser == null)
+                {
+                    return Unauthorized(new { message = "Authentication required. User not found." });
+                }
+                
+                // 2. Check if user owns the rating OR is admin
+                if (userId != requestingUserId && requestingUser.IsAdmin == 0)
+                {
+                    return StatusCode(403, new { message = "Forbidden. You can only delete your own ratings unless you are an admin." });
+                }
+                
+                // 3. Get the rating first
                 var rating = await _ratingDB.GetUserRatingForSongAsync(userId, songId);
                 if (rating == null)
                 {
                     return NotFound(new { message = "Rating not found" });
                 }
                 
-                // Delete using the rating ID
+                // 4. Delete using the rating ID
                 Dictionary<string, object> filter = new Dictionary<string, object>();
                 filter.Add("ratingid", rating.ratingid);
                 
